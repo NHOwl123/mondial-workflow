@@ -540,9 +540,9 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
                 <select value={editRel ? editRel.consolidationMethod : newRel.consolidationMethod}
                   onChange={e => editRel ? setEditRel(p => ({...p, consolidationMethod: e.target.value})) : setNewRel(p => ({...p, consolidationMethod: e.target.value}))}
                   style={inputStyle}>
-                  <option value="FULL">FULL — Full consolidation (&gt;50%)</option>
-                  <option value="EQUITY">EQUITY — Equity method (20–50%)</option>
-                  <option value="NONE">NONE — No consolidation (&lt;20%)</option>
+                  <option value="FULL">FULL - Full consolidation (over 50%)</option>
+                  <option value="EQUITY">EQUITY - Equity method (20 to 50%)</option>
+                  <option value="NONE">NONE - No consolidation (under 20%)</option>
                 </select>
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
@@ -1058,9 +1058,6 @@ export default function App() {
           )}
         </div>
       </div>
-    </div>
-  );
-}
     </div>
   );
 }
