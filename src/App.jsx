@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
+import ProjectTracking from "./ProjectTracking/index.jsx";
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const TEAL = "#1a7f8e";
@@ -785,6 +786,7 @@ export default function App() {
     { id: "reports",      label: "Reports",                 icon: "≡" },
     { id: "adjustments",  label: "Accounting Adjustments",  icon: "≡" },
     { id: "setup",        label: "Enterprise Setup",        icon: "⚙" },
+    { id: "projects",     label: "Project Tracking",        icon: "📊" },
   ];
 
   return (
@@ -824,6 +826,7 @@ export default function App() {
               {activeNav === "workflow" ? "Period-End Close Workflow"
                : activeNav === "reports" ? "Reports"
                : activeNav === "adjustments" ? "Accounting Adjustments"
+               : activeNav === "projects" ? "Project Tracking"
                : "Enterprise Setup"}
             </span>
             {activeNav === "workflow" && (
@@ -841,6 +844,7 @@ export default function App() {
 
         {/* Page content */}
         <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+          {activeNav === "projects" && <ProjectTracking />}
           {activeNav === "reports" && <PlaceholderPage title="Reports" />}
           {activeNav === "adjustments" && <PlaceholderPage title="Accounting Adjustments" />}
           {activeNav === "setup" && (
