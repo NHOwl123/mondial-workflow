@@ -72,7 +72,6 @@ const HIERARCHY_TYPES = [
   { id: "tax",      label: "Tax",      description: "Tax authority groupings for tax planning" },
 ];
 
-// All Shaneel companies
 const ALL_COMPANIES = [
   { id: "SEN",  name: "Shaneel Enterprises Ltd",                    regNum: "UK 2171783",      country: "UK",      type: "ultimate-parent" },
   { id: "SAD",  name: "SA Designer Parfums Limited",                regNum: "UK 4198899",      country: "UK",      type: "intermediate" },
@@ -85,7 +84,6 @@ const ALL_COMPANIES = [
   { id: "MPL",  name: "Mayfair Perfumes Ltd",                       regNum: "UK 3696250",      country: "UK",      type: "subsidiary" },
   { id: "SDE",  name: "SA Designer Parfums (Europe) Limited",       regNum: "Malta C103547",   country: "Malta",   type: "subsidiary" },
   { id: "SDM",  name: "Shaneel Designer Parfums Mexico S.A. de C.V.",regNum: "SDP2009224X8",   country: "Mexico",  type: "subsidiary" },
-  // Nirvana group
   { id: "DMH",  name: "Dilesh Mehta",                               regNum: "",                country: "UK",      type: "ultimate-parent" },
   { id: "NBH",  name: "Nirvana Brands Holdings Ltd",                regNum: "UK 13550616",     country: "UK",      type: "intermediate" },
   { id: "NBW",  name: "Nirvana Brands Worldwide Ltd",               regNum: "UK 13552578",     country: "UK",      type: "intermediate" },
@@ -97,9 +95,7 @@ const ALL_COMPANIES = [
   { id: "LDC",  name: "The Lovely Distribution Company Limited",    regNum: "",                country: "UK",      type: "subsidiary" },
 ];
 
-// Legal relationships: { parentId, childId, directPct, hierarchyType, consolidationMethod, effectiveFrom }
 const SEED_RELATIONSHIPS = [
-  // Shaneel group – Legal
   { id: "r1",  parentId: "SEN", childId: "SAD", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL",   effectiveFrom: "2010-01-01" },
   { id: "r2",  parentId: "SEN", childId: "PSH", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL",   effectiveFrom: "2010-01-01" },
   { id: "r3",  parentId: "SEN", childId: "SEE", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL",   effectiveFrom: "2010-01-01" },
@@ -112,7 +108,6 @@ const SEED_RELATIONSHIPS = [
   { id: "r10", parentId: "SEE", childId: "EAC", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL",   effectiveFrom: "2010-01-01" },
   { id: "r11", parentId: "SMX", childId: "SDM", directPct: 99.9, hierarchyType: "legal", consolidationMethod: "FULL",   effectiveFrom: "2010-01-01" },
   { id: "r12", parentId: "FEL", childId: "MPL", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL",   effectiveFrom: "2010-01-01" },
-  // Nirvana group – Legal
   { id: "r13", parentId: "DMH", childId: "NBH", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL",   effectiveFrom: "2021-01-01" },
   { id: "r14", parentId: "NBH", childId: "NBW", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL",   effectiveFrom: "2021-01-01" },
   { id: "r15", parentId: "NBH", childId: "NBL", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL",   effectiveFrom: "2021-01-01" },
@@ -190,7 +185,6 @@ function MethodBadge({ method }) {
   );
 }
 
-// Tree node renderer
 function TreeNode({ companyId, companies, relationships, hierarchyType, depth = 0, ultimateOwnership }) {
   const [collapsed, setCollapsed] = useState(false);
   const co = companies.find(c => c.id === companyId);
@@ -228,7 +222,6 @@ function TreeNode({ companyId, companies, relationships, hierarchyType, depth = 
         </div>
       </div>
       {!collapsed && children.map(r => {
-        const rel = relationships.find(x => x.id === r.id);
         return (
           <div key={r.id} style={{ marginLeft: 26 }}>
             <div style={{ fontSize: 10, color: "#6c757d", marginBottom: 2, marginLeft: 18, display: "flex", gap: 8 }}>
@@ -250,10 +243,9 @@ function TreeNode({ companyId, companies, relationships, hierarchyType, depth = 
   );
 }
 
-// ─── Hierarchies page ─────────────────────────────────────────────────────────
 function HierarchiesPage({ companies, setCompanies, relationships, setRelationships, hierarchyTypes, setHierarchyTypes }) {
   const [activeHType, setActiveHType] = useState("legal");
-  const [view, setView] = useState("tree"); // tree | table | companies
+  const [view, setView] = useState("tree");
   const [showAddRel, setShowAddRel] = useState(false);
   const [showAddCompany, setShowAddCompany] = useState(false);
   const [showAddHType, setShowAddHType] = useState(false);
@@ -263,14 +255,12 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
   const [newHType, setNewHType] = useState({ id: "", label: "", description: "" });
   const [filterRoot, setFilterRoot] = useState("ALL");
 
-  // Find root companies for this hierarchy type (parents that are never children)
   const hRels = relationships.filter(r => r.hierarchyType === activeHType);
   const childIds = new Set(hRels.map(r => r.childId));
   const parentIds = new Set(hRels.map(r => r.parentId));
   const rootCos = companies.filter(c => parentIds.has(c.id) && !childIds.has(c.id));
   const roots = rootCos.length > 0 ? rootCos : companies.filter(c => c.type === "ultimate-parent");
 
-  // Ultimate ownership per root
   const ultimateOwnershipByRoot = useMemo(() => {
     const combined = {};
     roots.forEach(r => {
@@ -325,7 +315,6 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", padding: 16, gap: 12 }}>
-      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 18, color: "#2c3e50", fontWeight: 700 }}>Group Hierarchies</h2>
@@ -340,7 +329,6 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
         </div>
       </div>
 
-      {/* Hierarchy type tabs */}
       <div style={{ display: "flex", gap: 0, background: "#fff", borderRadius: 8, border: "1px solid #dee2e6", overflow: "hidden", flexShrink: 0 }}>
         {hierarchyTypes.map(ht => (
           <button key={ht.id} onClick={() => setActiveHType(ht.id)}
@@ -354,7 +342,6 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
         ))}
       </div>
 
-      {/* View toggle + root filter */}
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {["tree","table","companies"].map(v => (
           <button key={v} onClick={() => setView(v)}
@@ -379,10 +366,7 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
         </div>
       </div>
 
-      {/* Main content area */}
       <div style={{ flex: 1, overflow: "auto", background: "#fff", borderRadius: 8, border: "1px solid #dee2e6", padding: 20 }}>
-
-        {/* ── TREE VIEW ── */}
         {view === "tree" && (
           <div>
             {hRels.length === 0 && (
@@ -409,7 +393,6 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
           </div>
         )}
 
-        {/* ── TABLE VIEW ── */}
         {view === "table" && (
           <div>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
@@ -447,8 +430,6 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
                 })}
               </tbody>
             </table>
-
-            {/* Ultimate ownership summary */}
             {hRels.length > 0 && (
               <div style={{ marginTop: 24 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#2c3e50", marginBottom: 10 }}>Computed Ultimate Ownership</div>
@@ -478,7 +459,6 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
           </div>
         )}
 
-        {/* ── COMPANIES VIEW ── */}
         {view === "companies" && (
           <div>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
@@ -504,7 +484,6 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
         )}
       </div>
 
-      {/* ── MODAL: Add/Edit Relationship ── */}
       {(showAddRel || editRel) && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ background: "#fff", borderRadius: 10, padding: 28, width: 480, boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
@@ -563,7 +542,6 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
         </div>
       )}
 
-      {/* ── MODAL: Add Company ── */}
       {showAddCompany && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ background: "#fff", borderRadius: 10, padding: 28, width: 440, boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
@@ -600,7 +578,6 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
         </div>
       )}
 
-      {/* ── MODAL: Add Hierarchy Type ── */}
       {showAddHType && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ background: "#fff", borderRadius: 10, padding: 28, width: 420, boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
@@ -630,7 +607,6 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
   );
 }
 
-// ─── Enterprise Setup shell ───────────────────────────────────────────────────
 function EnterpriseSetupPage({ companies, setCompanies, relationships, setRelationships, hierarchyTypes, setHierarchyTypes }) {
   const [subNav, setSubNav] = useState("hierarchies");
   const subItems = [{ id: "hierarchies", label: "Hierarchies", icon: "🏗" }];
@@ -659,7 +635,6 @@ function EnterpriseSetupPage({ companies, setCompanies, relationships, setRelati
   );
 }
 
-// ─── Placeholder pages ────────────────────────────────────────────────────────
 function PlaceholderPage({ title }) {
   return (
     <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#6c757d" }}>
@@ -672,9 +647,7 @@ function PlaceholderPage({ title }) {
   );
 }
 
-// ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
-  // Workflow state
   const [cells, setCells] = useState(() => makeCells());
   const [tasks, setTasks] = useState(TASKS);
   const [period, setPeriod] = useState("January 2026");
@@ -690,13 +663,11 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeNav, setActiveNav] = useState("workflow");
 
-  // Hierarchy state (persisted via window.storage)
   const [companies, setCompanies] = useState(ALL_COMPANIES);
   const [relationships, setRelationships] = useState(SEED_RELATIONSHIPS);
   const [hierarchyTypes, setHierarchyTypes] = useState(HIERARCHY_TYPES);
   const [storageLoaded, setStorageLoaded] = useState(false);
 
-  // Load from storage on mount
   useEffect(() => {
     loadHierarchyData().then(data => {
       if (data) {
@@ -708,13 +679,11 @@ export default function App() {
     });
   }, []);
 
-  // Save to storage whenever hierarchy data changes (after initial load)
   useEffect(() => {
     if (!storageLoaded) return;
     saveHierarchyData({ companies, relationships, hierarchyTypes });
   }, [companies, relationships, hierarchyTypes, storageLoaded]);
 
-  // ── Workflow helpers (unchanged from original) ──
   const key = selected ? `${selected.entity}::${selected.taskId}` : null;
   const cell = key ? cells[key] : null;
 
@@ -792,7 +761,7 @@ export default function App() {
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "'Segoe UI', Arial, sans-serif", fontSize: 13, background: "#f0f2f4" }}>
       {/* ── Sidebar ── */}
-      <div style={{ width: sidebarOpen ? 220 : 48, background: TEAL_DARK, color: "#fff", display: "flex", flexDirection: "column", transition: "width 0.2s", flexShrink: 0, overflow: "hidden" }}>
+      <div style={{ width: sidebarOpen ? 220 : 48, background: "orange", color: "#fff", display: "flex", flexDirection: "column", transition: "width 0.2s", flexShrink: 0, overflow: "hidden" }}>
         <div style={{ padding: "16px 12px", display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid rgba(255,255,255,0.15)" }}>
           <div style={{ width: 32, height: 32, background: "#fff", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <span style={{ color: TEAL, fontWeight: 900, fontSize: 15 }}>M</span>
@@ -819,7 +788,6 @@ export default function App() {
 
       {/* ── Main area ── */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {/* Top bar */}
         <div style={{ background: "#fff", borderBottom: "1px solid #dee2e6", padding: "0 20px", height: 48, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <span style={{ fontWeight: 700, fontSize: 15, color: "#2c3e50" }}>
@@ -842,7 +810,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Page content */}
         <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
           {activeNav === "projects" && <ProjectTracking />}
           {activeNav === "reports" && <PlaceholderPage title="Reports" />}
@@ -857,7 +824,6 @@ export default function App() {
 
           {activeNav === "workflow" && (
             <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", padding: 16, gap: 12 }}>
-              {/* Filters */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 12, color: "#6c757d" }}>Filter:</span>
@@ -889,7 +855,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Legend */}
               <div style={{ display: "flex", gap: 12, alignItems: "center", fontSize: 11 }}>
                 {[["complete","#d4edda","#28a745","Complete"],["overdue","#f8d7da","#dc3545","Overdue"],["due-soon","#fff3cd","#ffc107","Due Soon"],["on-track","#f8f9fa","#dee2e6","On Track"],["unassigned","#e9ecef","#ced4da","Unassigned"],["not-required","#e8e8f0","#9999bb","Not Required"]].map(([,bg,border,label]) => (
                   <div key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -899,7 +864,6 @@ export default function App() {
                 ))}
               </div>
 
-              {/* Grid */}
               <div style={{ flex: 1, overflow: "auto", background: "#fff", borderRadius: 8, border: "1px solid #dee2e6", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
                 <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
                   <colgroup>
@@ -978,7 +942,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Detail panel (workflow) */}
           {activeNav === "workflow" && selected && cell && (
             <div style={{ width: 320, background: "#fff", borderLeft: "1px solid #dee2e6", display: "flex", flexDirection: "column", overflow: "hidden", flexShrink: 0 }}>
               <div style={{ background: TEAL, color: "#fff", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
