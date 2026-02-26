@@ -408,13 +408,13 @@ export default function Dashboard({ state, onSelectProject }) {
             <table style={{ width:"100%",borderCollapse:"collapse",fontSize:13 }}>
               <thead>
                 <tr style={{ background:TEAL,color:"#fff" }}>
-                  <SortTh field="name" label="Project" />
-                  <SortTh field="oem" label="OEM Partner" />
+                  <SortTh field="name"   label="Project" />
+                  <SortTh field="oem"    label="OEM Partner" />
                   <SortTh field="status" label="Status" />
-                  <th style={{ padding:"10px 16px",textAlign:"left",fontWeight:600,fontSize:11,color:"#fff" }}>Lead</th>
-                  <SortTh field="hours" label="Hours" />
-                  <SortTh field="target" label="Go-Live" />
-                  <th style={{ padding:"10px 16px",textAlign:"center",fontWeight:600,fontSize:11,color:"#fff" }}>Days Left</th>
+                  <th style={{ padding:"10px 16px",textAlign:"left",fontWeight:600,fontSize:11,color:"#fff",whiteSpace:"nowrap" }}>Lead</th>
+                  <th style={{ padding:"10px 16px",textAlign:"left",fontWeight:600,fontSize:11,color:"#fff",whiteSpace:"nowrap",minWidth:160 }}>Progress</th>
+                  <SortTh field="target" label="Complete Date" />
+                  <th style={{ padding:"10px 16px",textAlign:"center",fontWeight:600,fontSize:11,color:"#fff",whiteSpace:"nowrap" }}>Days Left</th>
                 </tr>
               </thead>
               <tbody>
