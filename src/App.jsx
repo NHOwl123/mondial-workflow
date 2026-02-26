@@ -207,7 +207,7 @@ function TreeNode({ companyId, companies, relationships, hierarchyType, depth = 
           </button>
         )}
         {!hasChildren && <div style={{ width: 18, flexShrink: 0 }} />}
-        <div style={{ background: "#fff", border: `2px solid ${depth === 0 ? TEAL : "#ced4da"}`, borderRadius: 8, padding: "8px 12px", minWidth: 220, maxWidth: 340, boxShadow: depth === 0 ? "0 2px 6px rgba(0,0,0,0.1)" : "none" }}>
+        <div style={{ background: "#fff", border: `2px solid ${depth === 0 ?  : "#ced4da"}`, borderRadius: 8, padding: "8px 12px", minWidth: 220, maxWidth: 340, boxShadow: depth === 0 ? "0 2px 6px rgba(0,0,0,0.1)" : "none" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
             <span style={{ fontWeight: 700, fontSize: 12, color: "#2c3e50" }}>{co.name}</span>
           </div>
@@ -216,7 +216,7 @@ function TreeNode({ companyId, companies, relationships, hierarchyType, depth = 
             <span style={{ fontSize: 10, color: "#6c757d" }}>{co.country}</span>
             {co.regNum && <span style={{ fontSize: 9, color: "#adb5bd" }}>{co.regNum}</span>}
             {ult !== undefined && depth > 0 && (
-              <span style={{ fontSize: 10, color: TEAL_DARK, fontWeight: 600 }}>Ult: {ult.toFixed(2)}%</span>
+              <span style={{ fontSize: 10, color: _DARK, fontWeight: 600 }}>Ult: {ult.toFixed(2)}%</span>
             )}
           </div>
         </div>
@@ -309,7 +309,7 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
 
   const inputStyle = { border: "1px solid #ced4da", borderRadius: 4, padding: "6px 10px", fontSize: 12, width: "100%", boxSizing: "border-box" };
   const labelStyle = { fontSize: 11, color: "#6c757d", fontWeight: 600, marginBottom: 3, display: "block" };
-  const btnPrimary = { background: TEAL, color: "#fff", border: "none", borderRadius: 5, padding: "7px 16px", fontSize: 12, cursor: "pointer", fontWeight: 600 };
+  const btnPrimary = { background: , color: "#fff", border: "none", borderRadius: 5, padding: "7px 16px", fontSize: 12, cursor: "pointer", fontWeight: 600 };
   const btnGhost = { background: "#f8f9fa", color: "#495057", border: "1px solid #ced4da", borderRadius: 5, padding: "7px 16px", fontSize: 12, cursor: "pointer", fontWeight: 600 };
   const btnDanger = { background: "#fff", color: "#dc3545", border: "1px solid #dc3545", borderRadius: 5, padding: "4px 10px", fontSize: 11, cursor: "pointer" };
 
@@ -333,7 +333,7 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
         {hierarchyTypes.map(ht => (
           <button key={ht.id} onClick={() => setActiveHType(ht.id)}
             style={{ flex: 1, padding: "10px 16px", border: "none", borderRight: "1px solid #dee2e6", cursor: "pointer", fontSize: 12, fontWeight: 600,
-              background: activeHType === ht.id ? TEAL : "#fff",
+              background: activeHType === ht.id ?  : "#fff",
               color: activeHType === ht.id ? "#fff" : "#495057",
               transition: "all 0.15s" }}>
             {ht.label}
@@ -346,8 +346,8 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
         {["tree","table","companies"].map(v => (
           <button key={v} onClick={() => setView(v)}
             style={{ padding: "6px 14px", border: "1px solid #ced4da", borderRadius: 5, fontSize: 12, cursor: "pointer", fontWeight: 600,
-              background: view === v ? TEAL_LIGHT : "#fff", color: view === v ? TEAL_DARK : "#495057",
-              borderColor: view === v ? TEAL : "#ced4da" }}>
+              background: view === v ? _LIGHT : "#fff", color: view === v ? _DARK : "#495057",
+              borderColor: view === v ?  : "#ced4da" }}>
             {v === "tree" ? "🌳 Tree View" : v === "table" ? "📋 Relationship Table" : "🏢 Companies"}
           </button>
         ))}
@@ -397,7 +397,7 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
           <div>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead>
-                <tr style={{ background: TEAL, color: "#fff" }}>
+                <tr style={{ background: , color: "#fff" }}>
                   {["Parent Company","Child Company","Direct %","Ultimate %","Method","Effective From",""].map(h => (
                     <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, fontSize: 11 }}>{h}</th>
                   ))}
@@ -415,7 +415,7 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
                     <tr key={r.id} style={{ background: i % 2 === 0 ? "#fff" : "#f8f9fa", borderBottom: "1px solid #dee2e6" }}>
                       <td style={{ padding: "10px 12px", fontWeight: 600, color: "#2c3e50" }}>{parent?.name || r.parentId}</td>
                       <td style={{ padding: "10px 12px", color: "#495057" }}>{child?.name || r.childId}</td>
-                      <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: 700, color: TEAL_DARK }}>{r.directPct}%</td>
+                      <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: 700, color: _DARK }}>{r.directPct}%</td>
                       <td style={{ padding: "10px 12px", textAlign: "center", color: "#6c757d" }}>{ult !== undefined ? `${ult.toFixed(2)}%` : "—"}</td>
                       <td style={{ padding: "10px 12px" }}><MethodBadge method={r.consolidationMethod} /></td>
                       <td style={{ padding: "10px 12px", color: "#6c757d" }}>{r.effectiveFrom}</td>
@@ -435,9 +435,9 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#2c3e50", marginBottom: 10 }}>Computed Ultimate Ownership</div>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                   <thead>
-                    <tr style={{ background: TEAL_LIGHT }}>
+                    <tr style={{ background: _LIGHT }}>
                       {["Company","Ultimate % (by root)","Suggested Consolidation Method"].map(h => (
-                        <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, fontSize: 11, color: TEAL_DARK, borderBottom: `2px solid ${TEAL}` }}>{h}</th>
+                        <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, fontSize: 11, color: _DARK, borderBottom: `2px solid ${TEAL}` }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
