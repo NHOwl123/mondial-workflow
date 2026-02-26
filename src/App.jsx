@@ -207,7 +207,7 @@ function TreeNode({ companyId, companies, relationships, hierarchyType, depth = 
           </button>
         )}
         {!hasChildren && <div style={{ width: 18, flexShrink: 0 }} />}
-        <div style={{ background: "#fff", border: `2px solid ${depth === 0 ?  : "#ced4da"}`, borderRadius: 8, padding: "8px 12px", minWidth: 220, maxWidth: 340, boxShadow: depth === 0 ? "0 2px 6px rgba(0,0,0,0.1)" : "none" }}>
+        <div style={{ background: "#fff", border: `2px solid ${depth === 0 ? ""  : "#ced4da"}`, borderRadius: 8, padding: "8px 12px", minWidth: 220, maxWidth: 340, boxShadow: depth === 0 ? "0 2px 6px rgba(0,0,0,0.1)" : "none" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
             <span style={{ fontWeight: 700, fontSize: 12, color: "#2c3e50" }}>{co.name}</span>
           </div>
