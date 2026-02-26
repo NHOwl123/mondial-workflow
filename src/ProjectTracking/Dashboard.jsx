@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import * as XLSX from "xlsx";
 
 const TEAL = "#1a7f8e";
 const TEAL_DARK = "#145f6b";
@@ -274,6 +275,55 @@ export default function Dashboard({ state, onSelectProject }) {
     return [{ label:"All Projects", color:TEAL, items:filteredProjects }];
   }, [groupBy, filteredProjects, customers, orderedOems, consultants]);
 
+  function exportToExcel() {
+    const rows = filteredProjects.map(p => {
+      const effStatus = getEffectiveStatus(p);
+      const cust = customers.find(c => c.id === p.customerId);
+      const oem  = oemPartners.find(o => o.id === cust?.oemId);
+      const lead = consultants.find(u => u.id === p.leadConsultantId);
+      const totalUsed = p.categories.reduce((s,c) => s + (c.usedHours||0), 0);
+      const pct  = p.poHours > 0 ? Math.round((totalUsed / p.poHours) * 100) : 0;
+      const daysLeft = Math.ceil((new Date(p.targetDate) - new Date()) / 86400000);
+      return {
+        "Project":        p.name,
+        "Customer":       cust?.name || "—",
+        "OEM Partner":    oem?.name  || "—",
+        "Status":         STATUS_META[effStatus]?.label || effStatus,
+        "Lead Consultant":lead?.name || "—",
+        "PO Hours":       p.poHours,
+        "Hours Used":     totalUsed,
+        "Hours Remaining":p.poHours - totalUsed,
+        "Progress (%)":   pct,
+        "Complete Date":  p.targetDate || "—",
+        "Days Left":      p.status === "active" ? daysLeft : "—",
+        "Companies":      p.companies,
+        "Users":          p.users,
+        "Multi-Currency": p.multiCurrency ? "Yes" : "No",
+        "Dedicated Server":p.dedicatedServer ? "Yes" : "No",
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+
+    // Column widths
+    ws["!cols"] = [
+      { wch: 36 }, { wch: 28 }, { wch: 22 }, { wch: 14 },
+      { wch: 22 }, { wch: 10 }, { wch: 10 }, { wch: 16 },
+      { wch: 13 }, { wch: 14 }, { wch: 10 }, { wch: 11 },
+      { wch: 7  }, { wch: 14 }, { wch: 16 },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Projects");
+
+    // Build a filename that reflects active filters
+    const datePart = new Date().toISOString().slice(0,10);
+    const statusPart = filterStatuses.length < Object.keys(STATUS_META).length
+      ? `_${filterStatuses.map(s=>STATUS_META[s]?.label||s).join("-")}`
+      : "";
+    XLSX.writeFile(wb, `Projects${statusPart}_${datePart}.xlsx`);
+  }
+
   function SortTh({ field, label }) {
     const active = sortField===field;
     return (
@@ -341,6 +391,11 @@ export default function Dashboard({ state, onSelectProject }) {
         )}
 
         <span style={{ marginLeft:"auto",fontSize:12,color:"#6c757d" }}>{filteredProjects.length} project{filteredProjects.length!==1?"s":""}</span>
+        {view==="list" && (
+          <button onClick={exportToExcel} style={{ background:"#1d6f42",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:6 }}>
+            ⬇ Export to Excel
+          </button>
+        )}
       </div>
 
       {/* Filter panel */}
