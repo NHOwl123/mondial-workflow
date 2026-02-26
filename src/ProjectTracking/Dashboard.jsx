@@ -405,22 +405,48 @@ export default function Dashboard({ state, onSelectProject }) {
         {/* ── LIST VIEW ── */}
         {view==="list" && (
           <div style={{ background:"#fff",borderRadius:12,border:"1px solid #e9ecef",overflow:"hidden" }}>
-            <table style={{ width:"100%",borderCollapse:"collapse",fontSize:13 }}>
+            <table style={{ width:"100%",borderCollapse:"collapse",fontSize:13,tableLayout:"fixed" }}>
+              <colgroup>
+                <col style={{ width:"22%" }} />
+                <col style={{ width:"13%" }} />
+                <col style={{ width:"10%" }} />
+                <col style={{ width:"12%" }} />
+                <col style={{ width:"18%" }} />
+                <col style={{ width:"13%" }} />
+                <col style={{ width:"12%" }} />
+              </colgroup>
               <thead>
-                <tr style={{ background:TEAL,color:"#fff" }}>
-                  {[["name","Project"],["oem","OEM Partner"],["status","Status"]].map(([field,label])=>(
-                    <th key={field} onClick={()=>{ if(sortField===field) setSortDir(d=>d==="asc"?"desc":"asc"); else { setSortField(field); setSortDir("asc"); } }}
-                      style={{ padding:"10px 16px",textAlign:"left",fontWeight:600,fontSize:11,color:sortField===field?"#ffe":fff,whiteSpace:"nowrap",cursor:"pointer",userSelect:"none" }}>
-                      {label} {sortField===field?(sortDir==="asc"?"▲":"▼"):""}
+                <tr style={{ background:TEAL }}>
+                  {[
+                    { field:"name",    label:"Project",       align:"left"   },
+                    { field:"oem",     label:"OEM Partner",   align:"left"   },
+                    { field:"status",  label:"Status",        align:"left"   },
+                    { field:"lead",    label:"Lead",          align:"left",   noSort:true },
+                    { field:"hours",   label:"Progress",      align:"left",   noSort:true },
+                    { field:"target",  label:"Complete Date", align:"left"   },
+                    { field:"days",    label:"Days Left",     align:"center", noSort:true },
+                  ].map(col => (
+                    <th key={col.field}
+                      onClick={() => {
+                        if (col.noSort) return;
+                        if (sortField===col.field) setSortDir(d => d==="asc"?"desc":"asc");
+                        else { setSortField(col.field); setSortDir("asc"); }
+                      }}
+                      style={{
+                        padding:"10px 12px",
+                        textAlign:col.align,
+                        fontWeight:600,
+                        fontSize:11,
+                        color:"#ffffff",
+                        whiteSpace:"nowrap",
+                        cursor:col.noSort?"default":"pointer",
+                        userSelect:"none",
+                        overflow:"hidden",
+                        textOverflow:"ellipsis",
+                      }}>
+                      {col.label}{!col.noSort && sortField===col.field ? (sortDir==="asc"?" ▲":" ▼") : ""}
                     </th>
                   ))}
-                  <th style={{ padding:"10px 16px",textAlign:"left",fontWeight:600,fontSize:11,color:"#fff",whiteSpace:"nowrap" }}>Lead</th>
-                  <th style={{ padding:"10px 16px",textAlign:"left",fontWeight:600,fontSize:11,color:"#fff",whiteSpace:"nowrap",minWidth:160 }}>Progress</th>
-                  <th onClick={()=>{ if(sortField==="target") setSortDir(d=>d==="asc"?"desc":"asc"); else { setSortField("target"); setSortDir("asc"); } }}
-                    style={{ padding:"10px 16px",textAlign:"left",fontWeight:600,fontSize:11,color:sortField==="target"?"#ffe":"#fff",whiteSpace:"nowrap",cursor:"pointer",userSelect:"none" }}>
-                    Complete Date {sortField==="target"?(sortDir==="asc"?"▲":"▼"):""}
-                  </th>
-                  <th style={{ padding:"10px 16px",textAlign:"center",fontWeight:600,fontSize:11,color:"#fff",whiteSpace:"nowrap" }}>Days Left</th>
                 </tr>
               </thead>
               <tbody>
