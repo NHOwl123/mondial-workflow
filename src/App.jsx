@@ -613,7 +613,7 @@ function EnterpriseSetupPage({ companies, setCompanies, relationships, setRelati
   return (
     <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
       <div style={{ width: 180, background: "#f8f9fa", borderRight: "1px solid #dee2e6", padding: "12px 0" }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: "#6c757d", textTransform: "uppercase", letterSpacing: 0.5, padding: "0 14px 8px" }}>Enterprise Setup</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#6c757d", textTransform: "uppercase", letterSpacing: 0.5, padding: "0 14px 8px" }}>Enterprise Set Up</div>
         {subItems.map(si => (
           <div key={si.id} onClick={() => setSubNav(si.id)}
             style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", cursor: "pointer", fontSize: 12, fontWeight: 600,
@@ -754,14 +754,14 @@ export default function App() {
     { id: "workflow",     label: "Period-End Close",        icon: "▦" },
     { id: "reports",      label: "Reports",                 icon: "≡" },
     { id: "adjustments",  label: "Accounting Adjustments",  icon: "≡" },
-    { id: "setup",        label: "Enterprise Setup",        icon: "⚙" },
+    { id: "setup",        label: "Enterprise Set Up",        icon: "⚙" },
     { id: "projects",     label: "Project Tracking",        icon: "📊" },
   ];
 
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "'Segoe UI', Arial, sans-serif", fontSize: 13, background: "#f0f2f4" }}>
       {/* ── Sidebar ── */}
-      <div style={{ width: sidebarOpen ? 220 : 48, background: "orange", color: "#fff", display: "flex", flexDirection: "column", transition: "width 0.2s", flexShrink: 0, overflow: "hidden" }}>
+      <div style={{ width: sidebarOpen ? 220 : 48, background: "teal", color: "#fff", display: "flex", flexDirection: "column", transition: "width 0.2s", flexShrink: 0, overflow: "hidden" }}>
         <div style={{ padding: "16px 12px", display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid rgba(255,255,255,0.15)" }}>
           <div style={{ width: 32, height: 32, background: "#fff", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <span style={{ color: TEAL, fontWeight: 900, fontSize: 15 }}>M</span>
@@ -795,7 +795,7 @@ export default function App() {
                : activeNav === "reports" ? "Reports"
                : activeNav === "adjustments" ? "Accounting Adjustments"
                : activeNav === "projects" ? "Project Tracking"
-               : "Enterprise Setup"}
+               : "Enterprise Set Up"}
             </span>
             {activeNav === "workflow" && (
               <select value={period} onChange={e => setPeriod(e.target.value)}
