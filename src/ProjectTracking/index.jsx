@@ -17,7 +17,7 @@ function AddProjectModal({ state, onClose, onAdd }) {
   const { customers, oemPartners, consultants, templates } = state;
   const [form, setForm] = useState({
     name:"", customerId:"", leadConsultantId:"", consultantIds:[],
-    templateId:"", poHours:"", anticipatedHours:"",
+    templateId:"", poHours:"", authorizedHours:"",
     startDate: new Date().toISOString().slice(0,10),
     targetDate:"", companies:1, users:1,
     multiCurrency:false, dedicatedServer:false,
@@ -46,7 +46,7 @@ function AddProjectModal({ state, onClose, onAdd }) {
       id: "proj-"+Date.now(),
       ...form,
       poHours: parseFloat(form.poHours)||0,
-      anticipatedHours: parseFloat(form.anticipatedHours)||0,
+      authorizedHours: parseFloat(form.authorizedHours)||parseFloat(form.poHours)||0,
       companies: parseInt(form.companies)||1,
       users: parseInt(form.users)||1,
       consultantIds,
@@ -129,8 +129,20 @@ function AddProjectModal({ state, onClose, onAdd }) {
                 </div>
               </div>
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:12 }}>
-                <div><label style={labelStyle}>PO Hours</label><input type="number" min="0" value={form.poHours} onChange={e=>setForm(p=>({...p,poHours:e.target.value}))} style={inputStyle} placeholder="e.g. 80" /></div>
-                <div><label style={labelStyle}>Anticipated Hours</label><input type="number" min="0" value={form.anticipatedHours} onChange={e=>setForm(p=>({...p,anticipatedHours:e.target.value}))} style={inputStyle} placeholder="e.g. 80" /></div>
+                <div>
+                  <label style={labelStyle}>PO Hours</label>
+                  <input type="number" min="0" value={form.poHours}
+                    onChange={e=>setForm(p=>({...p,poHours:e.target.value,authorizedHours:p.authorizedHours!==p.poHours?p.authorizedHours:e.target.value}))}
+                    style={inputStyle} placeholder="e.g. 80" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Authorized Hours *</label>
+                  <input type="number" min="0" value={form.authorizedHours}
+                    onChange={e=>setForm(p=>({...p,authorizedHours:e.target.value}))}
+                    style={{ ...inputStyle, borderColor: form.authorizedHours?"#ced4da":"#dc3545" }}
+                    placeholder="Defaults to PO Hours" />
+                  {!form.authorizedHours && <div style={{ fontSize:11,color:"#dc3545",marginTop:3 }}>Required</div>}
+                </div>
               </div>
             </div>
           )}
@@ -149,6 +161,7 @@ function AddProjectModal({ state, onClose, onAdd }) {
                   ["Lead", consultants.find(u=>u.id===form.leadConsultantId)?.name||"—"],
                   ["Team size", form.consultantIds.length+(form.leadConsultantId&&!form.consultantIds.includes(form.leadConsultantId)?1:0)],
                   ["PO Hours", form.poHours||"—"],
+                  ["Authorized Hours", form.authorizedHours||form.poHours||"—"],
                 ].map(([k,v])=>(
                   <div key={k} style={{ display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #d4ecef",fontSize:13 }}>
                     <span style={{ color:"#6c757d",fontWeight:600 }}>{k}</span>

@@ -93,7 +93,9 @@ function ProjectCard({ project, customer, oem, consultants, onClick }) {
 // ── List View Row ─────────────────────────────────────────────────────────────
 function ProjectRow({ project, customer, oem, consultants, onClick }) {
   const totalUsed = project.categories.reduce((s,c)=>s+(c.usedHours||0),0);
-  const pct = project.poHours>0?Math.round((totalUsed/project.poHours)*100):0;
+  const plannedHours = project.categories.reduce((s,c)=>s+(c.plannedHours||0),0);
+  const denominator = plannedHours>0 ? plannedHours : (project.authorizedHours||project.poHours||0);
+  const pct = denominator>0?Math.round((totalUsed/denominator)*100):0;
   const lead = consultants.find(u=>u.id===project.leadConsultantId);
   const effStatus = getEffectiveStatus(project);
   const daysLeft = Math.ceil((new Date(project.targetDate)-new Date())/86400000);
@@ -111,8 +113,8 @@ function ProjectRow({ project, customer, oem, consultants, onClick }) {
       <td style={{ padding:"12px 16px",fontSize:12,color:"#6c757d" }}>{lead?.name||"—"}</td>
       <td style={{ padding:"12px 16px",fontSize:12 }}>
         <div style={{ display:"flex",alignItems:"center",gap:8 }}>
-          <div style={{ flex:1,minWidth:80 }}><HoursBar used={totalUsed} po={project.poHours} /></div>
-          <span style={{ color:totalUsed>project.poHours?"#dc3545":"#6c757d",fontSize:11,whiteSpace:"nowrap" }}>{totalUsed}/{project.poHours}h</span>
+          <div style={{ flex:1,minWidth:80 }}><HoursBar used={totalUsed} po={denominator} /></div>
+          <span style={{ color:totalUsed>denominator?"#dc3545":"#6c757d",fontSize:11,whiteSpace:"nowrap" }}>{totalUsed}/{denominator}h</span>
         </div>
       </td>
       <td style={{ padding:"12px 16px",fontSize:12,color:"#6c757d",textAlign:"center" }}>
