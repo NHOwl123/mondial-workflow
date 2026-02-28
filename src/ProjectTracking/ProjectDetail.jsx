@@ -93,13 +93,13 @@ function OverviewTab({ project, state, onUpdate }) {
       multiCurrency: project.multiCurrency,
       dedicatedServer: project.dedicatedServer,
       poHours: project.poHours,
-      anticipatedHours: project.anticipatedHours,
+      authorizedHours: project.authorizedHours ?? project.poHours,
       customerId: project.customerId,
     });
     setEditing(true);
   }
   function saveEdit() {
-    onUpdate({ ...project, ...form, poHours: parseFloat(form.poHours)||0, anticipatedHours: parseFloat(form.anticipatedHours)||0, companies: parseInt(form.companies)||0, users: parseInt(form.users)||0 });
+    onUpdate({ ...project, ...form, poHours: parseFloat(form.poHours)||0, authorizedHours: parseFloat(form.authorizedHours)||parseFloat(form.poHours)||0, companies: parseInt(form.companies)||0, users: parseInt(form.users)||0 });
     setEditing(false);
   }
   function saveNotes() {
@@ -123,8 +123,9 @@ function OverviewTab({ project, state, onUpdate }) {
     ["Users", project.users],
     ["Multi-Currency", project.multiCurrency?"Yes":"No"],
     ["Dedicated Server", project.dedicatedServer?"Yes":"No"],
-    ["PO Hours", `${project.poHours}h`],
-    ["Anticipated Hours", `${project.anticipatedHours}h`],
+     ["PO Hours", `${project.poHours}h`],
+    ["Authorized Hours", `${project.authorizedHours ?? project.poHours}h`],
+    ["Planned Hours", `${totalPlanned}h`],
   ];
 
   return (
@@ -144,17 +145,45 @@ function OverviewTab({ project, state, onUpdate }) {
       </div>
 
       <div style={{ display:"flex",flexDirection:"column",gap:16 }}>
-        {/* Hours */}
+       {/* Hours */}
         <div style={{ background:"#fff",borderRadius:12,padding:20,border:"1px solid #e9ecef" }}>
           <h3 style={{ margin:"0 0 14px",fontSize:14,color:"#2c3e50" }}>Hours Overview</h3>
           <HoursBar used={totalUsed} planned={totalPlanned} po={project.poHours} />
+
+          {/* Three-way comparison */}
           <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginTop:16 }}>
-            {[["PO Hours",project.poHours,TEAL_DARK],["Used",totalUsed,totalUsed>project.poHours?"#dc3545":TEAL],["Remaining",hoursRemaining,hoursRemaining<0?"#dc3545":"#28a745"]].map(([l,v,c])=>(
+            {[
+              ["PO Hours",       project.poHours,                                                  TEAL_DARK],
+              ["Authorized Hrs", project.authorizedHours ?? project.poHours,                       (project.authorizedHours ?? project.poHours)!==project.poHours?"#856404":TEAL_DARK],
+              ["Planned Hrs",    totalPlanned,                                                      totalPlanned>(project.authorizedHours??project.poHours)?"#dc3545":totalPlanned<(project.authorizedHours??project.poHours)?"#856404":"#28a745"],
+            ].map(([l,v,c])=>(
               <div key={l} style={{ textAlign:"center",padding:12,background:"#f8f9fa",borderRadius:8 }}>
                 <div style={{ fontSize:22,fontWeight:800,color:c }}>{v}h</div>
                 <div style={{ fontSize:11,color:"#6c757d" }}>{l}</div>
               </div>
             ))}
+          </div>
+
+          {/* Variance callouts */}
+          <div style={{ display:"flex",flexDirection:"column",gap:6,marginTop:14 }}>
+            {(project.authorizedHours ?? project.poHours) !== project.poHours && (
+              <div style={{ fontSize:12,padding:"6px 12px",borderRadius:6,background:"#fff3cd",color:"#856404",border:"1px solid #ffc107" }}>
+                ⚠ Authorized Hours ({project.authorizedHours}h) differ from PO Hours ({project.poHours}h) by {Math.abs(project.authorizedHours-project.poHours)}h
+              </div>
+            )}
+            {totalPlanned > 0 && totalPlanned !== (project.authorizedHours ?? project.poHours) && (
+              <div style={{ fontSize:12,padding:"6px 12px",borderRadius:6,
+                background: totalPlanned>(project.authorizedHours??project.poHours)?"#f8d7da":"#fff3cd",
+                color:      totalPlanned>(project.authorizedHours??project.poHours)?"#721c24":"#856404",
+                border:    `1px solid ${totalPlanned>(project.authorizedHours??project.poHours)?"#dc3545":"#ffc107"}` }}>
+                {totalPlanned>(project.authorizedHours??project.poHours)
+                  ? `⚠ Planned Hours (${totalPlanned}h) exceed Authorized Hours (${project.authorizedHours??project.poHours}h) by ${totalPlanned-(project.authorizedHours??project.poHours)}h`
+                  : `ℹ Planned Hours (${totalPlanned}h) are ${(project.authorizedHours??project.poHours)-totalPlanned}h under Authorized Hours (${project.authorizedHours??project.poHours}h)`}
+              </div>
+            )}
+            <div style={{ fontSize:12,padding:"6px 12px",borderRadius:6,background:"#f8f9fa",color:"#495057",border:"1px solid #e9ecef" }}>
+              Actual Hours used: <strong>{totalUsed}h</strong> &nbsp;·&nbsp; Remaining: <strong style={{ color:project.poHours-totalUsed<0?"#dc3545":"#28a745" }}>{project.poHours-totalUsed}h</strong>
+            </div>
           </div>
         </div>
 
@@ -182,8 +211,14 @@ function OverviewTab({ project, state, onUpdate }) {
 
         {totalUsed > project.poHours && (
           <div style={{ background:"#f8d7da",borderRadius:12,padding:16,border:"1px solid #dc3545" }}>
-            <div style={{ fontSize:12,fontWeight:700,color:"#721c24" }}>⚠ Hours Exceeded PO</div>
-            <div style={{ fontSize:12,color:"#721c24",marginTop:4 }}>Used hours ({totalUsed}h) exceed the PO ({project.poHours}h) by {totalUsed-project.poHours}h.</div>
+            <div style={{ fontSize:12,fontWeight:700,color:"#721c24" }}>⚠ Actual Hours Exceed PO</div>
+            <div style={{ fontSize:12,color:"#721c24",marginTop:4 }}>Actual hours used ({totalUsed}h) exceed the PO ({project.poHours}h) by {totalUsed-project.poHours}h.</div>
+          </div>
+        )}
+        {totalUsed > (project.authorizedHours ?? project.poHours) && totalUsed <= project.poHours && (
+          <div style={{ background:"#fff3cd",borderRadius:12,padding:16,border:"1px solid #ffc107" }}>
+            <div style={{ fontSize:12,fontWeight:700,color:"#856404" }}>⚠ Actual Hours Exceed Authorized Hours</div>
+            <div style={{ fontSize:12,color:"#856404",marginTop:4 }}>Actual hours used ({totalUsed}h) exceed Authorized Hours ({project.authorizedHours ?? project.poHours}h) by {totalUsed-(project.authorizedHours??project.poHours)}h.</div>
           </div>
         )}
       </div>
@@ -196,7 +231,7 @@ function OverviewTab({ project, state, onUpdate }) {
             <div><label style={labelStyle}>Start Date</label><input type="date" value={form.startDate} onChange={e=>setForm(p=>({...p,startDate:e.target.value}))} style={inputStyle} /></div>
             <div><label style={labelStyle}>Target Go-Live</label><input type="date" value={form.targetDate} onChange={e=>setForm(p=>({...p,targetDate:e.target.value}))} style={inputStyle} /></div>
             <div><label style={labelStyle}>PO Hours</label><input type="number" value={form.poHours} onChange={e=>setForm(p=>({...p,poHours:e.target.value}))} style={inputStyle} /></div>
-            <div><label style={labelStyle}>Anticipated Hours</label><input type="number" value={form.anticipatedHours} onChange={e=>setForm(p=>({...p,anticipatedHours:e.target.value}))} style={inputStyle} /></div>
+            <div><label style={labelStyle}>Authorized Hours</label><input type="number" value={form.authorizedHours} onChange={e=>setForm(p=>({...p,authorizedHours:e.target.value}))} style={inputStyle} /></div>
             <div><label style={labelStyle}>Companies</label><input type="number" value={form.companies} onChange={e=>setForm(p=>({...p,companies:e.target.value}))} style={inputStyle} /></div>
             <div><label style={labelStyle}>Users</label><input type="number" value={form.users} onChange={e=>setForm(p=>({...p,users:e.target.value}))} style={inputStyle} /></div>
           </div>
