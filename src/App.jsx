@@ -143,8 +143,7 @@ function calcUltimateOwnership(relationships, rootId, hierarchyType) {
 function suggestMethod(pct) { return pct > 50 ? "FULL" : pct >= 20 ? "EQUITY" : "NONE"; }
 
 // ─── Storage helpers ──────────────────────────────────────────────────────────
-
-const HIER_KEY = "hierarchies";   // Firestore document id inside "app-data" collection
+const HIER_KEY = "hierarchies";
 
 async function loadHierarchyData() {
   try {
@@ -331,7 +330,6 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
         )}
       </div>
 
-      {/* Relationship modal */}
       {(showAddRel||editRel) && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center" }}>
           <div style={{ background:"#fff", borderRadius:10, padding:28, width:480, boxShadow:"0 8px 32px rgba(0,0,0,0.2)" }}>
@@ -432,11 +430,35 @@ function PlaceholderPage({ title }) {
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
-  // ── Auth state ─────────────────────────────────────────────────────────────
-  const [users, setUsers]             = useState(null);   // null = loading
-  const [currentUser, setCurrentUser] = useState(null);
-  const [authLoaded, setAuthLoaded]   = useState(false);
+  // ── ALL state declarations at the top — never conditionally ───────────────
+  const [users, setUsers]                   = useState(null);
+  const [currentUser, setCurrentUser]       = useState(null);
+  const [authLoaded, setAuthLoaded]         = useState(false);
+  const [activeNav, setActiveNav]           = useState("projects");
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
+  // Workflow state
+  const [cells, setCells]                   = useState(() => makeCells());
+  const [tasks, setTasks]                   = useState(TASKS);
+  const [period, setPeriod]                 = useState("January 2026");
+  const [selected, setSelected]             = useState(null);
+  const [filterStatus, setFilterStatus]     = useState("all");
+  const [filterEntity, setFilterEntity]     = useState("all");
+  const [noteInput, setNoteInput]           = useState("");
+  const [panel, setPanel]                   = useState("detail");
+  const [showAddTask, setShowAddTask]       = useState(false);
+  const [newTaskName, setNewTaskName]       = useState("");
+  const [editingTask, setEditingTask]       = useState(null);
+  const [editTaskName, setEditTaskName]     = useState("");
+  const [sidebarOpen, setSidebarOpen]       = useState(true);
+
+  // Hierarchy state
+  const [companies, setCompanies]           = useState(ALL_COMPANIES);
+  const [relationships, setRelationships]   = useState(SEED_RELATIONSHIPS);
+  const [hierarchyTypes, setHierarchyTypes] = useState(HIERARCHY_TYPES);
+  const [storageLoaded, setStorageLoaded]   = useState(false);
+
+  // ── Effects ────────────────────────────────────────────────────────────────
   useEffect(() => {
     loadUsers().then(u => {
       setUsers(u);
@@ -445,51 +467,6 @@ export default function App() {
       setAuthLoaded(true);
     });
   }, []);
-
-  async function handleUsersChange(updated) {
-    setUsers(updated);
-    await saveUsers(updated);
-    // If current user's own record changed, refresh it
-    if (currentUser) {
-      const refreshed = updated.find(u => u.id === currentUser.id);
-      if (refreshed) setCurrentUser(refreshed);
-    }
-  }
-
-  function handleLogin(user) {
-    // Update lastLogin
-    const updated = users.map(u => u.id === user.id ? { ...u, lastLogin: new Date().toISOString() } : u);
-    handleUsersChange(updated);
-    setCurrentUser(user);
-  }
-
-  function handleLogout() {
-    logout();
-    setCurrentUser(null);
-    setActiveNav("projects");
-  }
-
-  // ── Workflow state ─────────────────────────────────────────────────────────
-  const [cells, setCells]             = useState(() => makeCells());
-  const [tasks, setTasks]             = useState(TASKS);
-  const [period, setPeriod]           = useState("January 2026");
-  const [selected, setSelected]       = useState(null);
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [filterEntity, setFilterEntity] = useState("all");
-  const [noteInput, setNoteInput]     = useState("");
-  const [panel, setPanel]             = useState("detail");
-  const [showAddTask, setShowAddTask] = useState(false);
-  const [newTaskName, setNewTaskName] = useState("");
-  const [editingTask, setEditingTask] = useState(null);
-  const [editTaskName, setEditTaskName] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeNav, setActiveNav]     = useState("projects");
-
-  // ── Hierarchy state ────────────────────────────────────────────────────────
-  const [companies, setCompanies]           = useState(ALL_COMPANIES);
-  const [relationships, setRelationships]   = useState(SEED_RELATIONSHIPS);
-  const [hierarchyTypes, setHierarchyTypes] = useState(HIERARCHY_TYPES);
-  const [storageLoaded, setStorageLoaded]   = useState(false);
 
   useEffect(() => {
     loadHierarchyData().then(data => {
@@ -507,10 +484,29 @@ export default function App() {
     saveHierarchyData({ companies, relationships, hierarchyTypes });
   }, [companies, relationships, hierarchyTypes, storageLoaded]);
 
-  // ── Profile dropdown ───────────────────────────────────────────────────────
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  // ── Auth handlers ──────────────────────────────────────────────────────────
+  async function handleUsersChange(updated) {
+    setUsers(updated);
+    await saveUsers(updated);
+    if (currentUser) {
+      const refreshed = updated.find(u => u.id === currentUser.id);
+      if (refreshed) setCurrentUser(refreshed);
+    }
+  }
 
-  // ── Loading / auth gate ────────────────────────────────────────────────────
+  function handleLogin(user) {
+    const updated = users.map(u => u.id === user.id ? { ...u, lastLogin: new Date().toISOString() } : u);
+    handleUsersChange(updated);
+    setCurrentUser(user);
+  }
+
+  function handleLogout() {
+    logout();
+    setCurrentUser(null);
+    setActiveNav("projects");
+  }
+
+  // ── Loading screen ─────────────────────────────────────────────────────────
   if (!authLoaded || !users) {
     return (
       <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#f4f6f9", fontFamily:"'Segoe UI', Arial, sans-serif" }}>
@@ -522,30 +518,29 @@ export default function App() {
     );
   }
 
+  // ── Login screen ───────────────────────────────────────────────────────────
   if (!currentUser) {
     return <LoginPage users={users} onLogin={handleLogin} />;
   }
 
   // ── Derived permissions ────────────────────────────────────────────────────
-  const isAdmin      = currentUser.role === "administrator";
-  const canSeeTest   = currentUser.testFeatures;   // Period-End Close, Reports, Adjustments, Setup
+  const isAdmin    = currentUser.role === "administrator";
+  const canSeeTest = currentUser.testFeatures;
 
-  // ── Nav items ──────────────────────────────────────────────────────────────
   const navItems = [
-    { id:"projects",    label:"Project Tracking",      icon:"📊", always:true  },
-    { id:"admin",       label:"Admin",                 icon:"🔒", adminOnly:true },
-    { id:"workflow",    label:"Period-End Close",      icon:"▦",  testOnly:true },
-    { id:"reports",     label:"Reports",               icon:"≡",  testOnly:true },
-    { id:"adjustments", label:"Accounting Adjustments",icon:"≡",  testOnly:true },
-    { id:"setup",       label:"Enterprise Set Up",     icon:"⚙",  testOnly:true },
+    { id:"projects",    label:"Project Tracking",       icon:"📊", always:true   },
+    { id:"admin",       label:"Admin",                  icon:"🔒", adminOnly:true },
+    { id:"workflow",    label:"Period-End Close",        icon:"▦",  testOnly:true  },
+    { id:"reports",     label:"Reports",                icon:"≡",  testOnly:true  },
+    { id:"adjustments", label:"Accounting Adjustments", icon:"≡",  testOnly:true  },
+    { id:"setup",       label:"Enterprise Set Up",      icon:"⚙",  testOnly:true  },
   ].filter(n => {
     if (n.adminOnly) return isAdmin;
     if (n.testOnly)  return canSeeTest;
     return true;
   });
 
-  // If current nav is no longer visible (e.g. permissions changed), reset
-  const validNav = navItems.some(n => n.id === activeNav);
+  const validNav    = navItems.some(n => n.id === activeNav);
   const effectiveNav = validNav ? activeNav : "projects";
 
   const pageTitle = {
@@ -588,8 +583,7 @@ export default function App() {
 
   return (
     <div style={{ display:"flex", height:"100vh", fontFamily:"'Segoe UI', Arial, sans-serif", fontSize:13, background:"#f0f2f4" }}>
-
-      {/* ── Sidebar ── */}
+      {/* Sidebar */}
       <div style={{ width:sidebarOpen?220:48, background:"teal", color:"#fff", display:"flex", flexDirection:"column", transition:"width 0.2s", flexShrink:0, overflow:"hidden" }}>
         <div style={{ padding:"16px 12px", display:"flex", alignItems:"center", gap:10, borderBottom:"1px solid rgba(255,255,255,0.15)" }}>
           <div style={{ width:32, height:32, background:"#fff", borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
@@ -614,9 +608,8 @@ export default function App() {
         </div>
       </div>
 
-      {/* ── Main area ── */}
+      {/* Main area */}
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-
         {/* Top bar */}
         <div style={{ background:"#fff", borderBottom:"1px solid #dee2e6", padding:"0 20px", height:48, display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
           <div style={{ display:"flex", alignItems:"center", gap:16 }}>
@@ -627,8 +620,6 @@ export default function App() {
               </select>
             )}
           </div>
-
-          {/* Profile area */}
           <div style={{ position:"relative" }}>
             <div onClick={()=>setShowProfileMenu(p=>!p)}
               style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", padding:"4px 8px", borderRadius:8, background:showProfileMenu?"#f0f2f4":"transparent" }}>
@@ -637,8 +628,6 @@ export default function App() {
                 {initials(currentUser)}
               </div>
             </div>
-
-            {/* Dropdown */}
             {showProfileMenu && (
               <div style={{ position:"absolute", right:0, top:44, background:"#fff", borderRadius:10, border:"1px solid #e9ecef", boxShadow:"0 8px 24px rgba(0,0,0,0.12)", minWidth:220, zIndex:500 }}
                 onMouseLeave={()=>setShowProfileMenu(false)}>
