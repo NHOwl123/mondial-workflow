@@ -104,8 +104,8 @@ function ProjectRow({ project, customer, oem, consultants, onClick }) {
       onMouseEnter={e=>e.currentTarget.style.background="#f0f9fa"}
       onMouseLeave={e=>e.currentTarget.style.background=""}>
       <td style={{ padding:"12px 16px",fontWeight:700,color:"#2c3e50",fontSize:13 }}>
-        <div>{project.name}</div>
-        <div style={{ fontSize:11,color:"#6c757d",fontWeight:400,marginTop:2 }}>{customer?.name}</div>
+        <div>{customer?.name||"—"}</div>
+        <div style={{ fontSize:11,color:"#6c757d",fontWeight:400,marginTop:2 }}>{project.name}</div>
       </td>
       <td style={{ padding:"12px 16px",fontSize:12,color:"#6c757d" }}>{oem?.name||"—"}</td>
       <td style={{ padding:"12px 16px" }}><StatusPill status={effStatus} /></td>
@@ -194,7 +194,7 @@ export default function Dashboard({ state, onSelectProject }) {
   const [filterConsultantIds, setFilterConsultantIds] = useState([]);
 
   // Sort state (list view)
-  const [sortField, setSortField] = useState("name");
+  const [sortField, setSortField] = useState("customer");
   const [sortDir, setSortDir] = useState("asc");
 
   // Group by (cards)
@@ -241,6 +241,7 @@ export default function Dashboard({ state, onSelectProject }) {
     ps = [...ps].sort((a,b) => {
       let va, vb;
       if (sortField==="name") { va=a.name; vb=b.name; }
+      else if (sortField==="customer") { const ca=customers.find(c=>c.id===a.customerId); const cb=customers.find(c=>c.id===b.customerId); va=ca?.name||""; vb=cb?.name||""; }
       else if (sortField==="status") { va=getEffectiveStatus(a); vb=getEffectiveStatus(b); }
       else if (sortField==="target") { va=a.targetDate; vb=b.targetDate; }
       else if (sortField==="hours") { va=a.categories.reduce((s,c)=>s+c.usedHours,0); vb=b.categories.reduce((s,c)=>s+c.usedHours,0); }
@@ -475,7 +476,7 @@ export default function Dashboard({ state, onSelectProject }) {
               <thead>
                 <tr style={{ background:TEAL }}>
                   {[
-                    { field:"name",    label:"Project",       align:"left"   },
+                    { field:"name",    label:"Customer",      align:"left"   },
                     { field:"oem",     label:"OEM Partner",   align:"left"   },
                     { field:"status",  label:"Status",        align:"left"   },
                     { field:"lead",    label:"Lead",          align:"left",   noSort:true },

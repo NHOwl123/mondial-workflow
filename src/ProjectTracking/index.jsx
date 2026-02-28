@@ -76,13 +76,13 @@ function AddProjectModal({ state, onClose, onAdd }) {
         <div style={{ padding:24 }}>
           {step===1 && (
             <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
-              <div><label style={labelStyle}>Project Name *</label><input value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} style={inputStyle} placeholder="e.g. Hartwell — Phase 2" /></div>
               <div><label style={labelStyle}>Customer *</label>
-                <select value={form.customerId} onChange={e=>setForm(p=>({...p,customerId:e.target.value}))} style={inputStyle}>
+                <select value={form.customerId} onChange={e=>{ const cust=activeCustomers.find(c=>c.id===e.target.value); setForm(p=>({...p,customerId:e.target.value,name:p.name||cust?.name||""})); }} style={inputStyle}>
                   <option value="">— Select customer —</option>
                   {activeCustomers.map(c=>{ const oem=oemPartners.find(o=>o.id===c.oemId); return <option key={c.id} value={c.id}>{c.name}{oem?` (${oem.name})`:""}</option>; })}
                 </select>
               </div>
+              <div><label style={labelStyle}>Project Name *</label><input value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} style={inputStyle} placeholder="Defaults to customer name" /></div>
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:12 }}>
                 <div><label style={labelStyle}>Start Date</label><input type="date" value={form.startDate} onChange={e=>setForm(p=>({...p,startDate:e.target.value}))} style={inputStyle} /></div>
                 <div><label style={labelStyle}>Target Go-Live</label><input type="date" value={form.targetDate} onChange={e=>setForm(p=>({...p,targetDate:e.target.value}))} style={inputStyle} /></div>
@@ -152,8 +152,8 @@ function AddProjectModal({ state, onClose, onAdd }) {
               <div style={{ background:TEAL_LIGHT,borderRadius:10,padding:16,marginBottom:16 }}>
                 <div style={{ fontWeight:700,fontSize:14,color:"#2c3e50",marginBottom:12 }}>Project Summary</div>
                 {[
-                  ["Name", form.name||"—"],
                   ["Customer", customers.find(c=>c.id===form.customerId)?.name||"—"],
+                  ["Project Name", form.name||"—"],
                   ["Status", form.status],
                   ["Start", form.startDate||"—"],
                   ["Go-Live", form.targetDate||"—"],
