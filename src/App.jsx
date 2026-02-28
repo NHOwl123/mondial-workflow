@@ -144,7 +144,7 @@ function suggestMethod(pct) { return pct > 50 ? "FULL" : pct >= 20 ? "EQUITY" : 
 
 // ─── Storage helpers ──────────────────────────────────────────────────────────
 
-Const HIER_KEY = "hierarchies";   // Firestore document id inside "app-data" collection
+const HIER_KEY = "hierarchies";   // Firestore document id inside "app-data" collection
 
 async function loadHierarchyData() {
   try {
