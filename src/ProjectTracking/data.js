@@ -1,17 +1,25 @@
 // ─── Storage ──────────────────────────────────────────────────────────────────
-const STORAGE_KEY = "mondial-psa-v1";
+import { db } from "../firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+
+const STORAGE_KEY = "psa-data";
 
 export async function loadPSAData() {
   try {
-    const res = await window.storage.get(STORAGE_KEY, true);
-    return res ? JSON.parse(res.value) : null;
-  } catch { return null; }
+    const snap = await getDoc(doc(db, "app-data", STORAGE_KEY));
+    return snap.exists() ? snap.data().state : null;
+  } catch (e) {
+    console.error("PSA load failed", e);
+    return null;
+  }
 }
 
 export async function savePSAData(data) {
   try {
-    await window.storage.set(STORAGE_KEY, JSON.stringify(data), true);
-  } catch (e) { console.error("PSA storage save failed", e); }
+    await setDoc(doc(db, "app-data", STORAGE_KEY), { state: data });
+  } catch (e) {
+    console.error("PSA save failed", e);
+  }
 }
 
 // ─── Seed data ────────────────────────────────────────────────────────────────
