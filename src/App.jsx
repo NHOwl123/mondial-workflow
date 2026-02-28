@@ -5,6 +5,7 @@ import AdminPage from "./AdminPage.jsx";
 import { loadUsers, saveUsers, resolveSession, logout, fullName, initials } from "./auth.js";
 import { db } from "./firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import { APP_VERSION, loadStoredVersion, saveStoredVersion, loadPSAData, savePSAData, buildInitialState } from "./ProjectTracking/data";
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const TEAL       = "#1a7f8e";
@@ -436,6 +437,8 @@ export default function App() {
   const [authLoaded, setAuthLoaded]         = useState(false);
   const [activeNav, setActiveNav]           = useState("projects");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [versionModal, setVersionModal]     = useState(null);
+const [versionChecked, setVersionChecked] = useState(false);
 
   // Workflow state
   const [cells, setCells]                   = useState(() => makeCells());
@@ -478,6 +481,18 @@ export default function App() {
       setStorageLoaded(true);
     });
   }, []);
+  useEffect(() => {
+    if (!authLoaded) return;
+    (async () => {
+      const stored = await loadStoredVersion();
+      if (!stored || stored === APP_VERSION) {
+        await saveStoredVersion(APP_VERSION);
+        setVersionChecked(true);
+      } else {
+        setVersionModal({ stored, next: APP_VERSION });
+      }
+    })();
+  }, [authLoaded]);
 
   useEffect(() => {
     if (!storageLoaded) return;
@@ -505,6 +520,22 @@ export default function App() {
     setCurrentUser(null);
     setActiveNav("projects");
   }
+  async function handleVersionKeep() {
+    await saveStoredVersion(APP_VERSION);
+    setVersionModal(null);
+    setVersionChecked(true);
+  }
+
+  async function handleVersionReset() {
+    const current = await loadPSAData();
+    if (current) {
+      await createBackup(current, `Pre-upgrade backup — ${new Date().toLocaleString("en-GB")}`);
+    }
+    await savePSAData(buildInitialState());
+    await saveStoredVersion(APP_VERSION);
+    setVersionModal(null);
+    setVersionChecked(true);
+  }
 
 const filteredEntities = useMemo(() => filterEntity!=="all" ? ENTITIES.filter(e=>e===filterEntity) : ENTITIES, [filterEntity]);
   const visibleEntities  = useMemo(() => {
@@ -513,7 +544,7 @@ const filteredEntities = useMemo(() => filterEntity!=="all" ? ENTITIES.filter(e=
   }, [filterStatus, filteredEntities, cells, tasks]);
 
   // ── Loading screen ─────────────────────────────────────────────────────────
-  if (!authLoaded || !users) {
+  if (!authLoaded || !users || (!versionChecked && !versionModal)) {
     return (
       <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#f4f6f9", fontFamily:"'Segoe UI', Arial, sans-serif" }}>
         <div style={{ textAlign:"center", color:"#6c757d" }}>
@@ -585,7 +616,32 @@ const filteredEntities = useMemo(() => filterEntity!=="all" ? ENTITIES.filter(e=
 
   return (
     <div style={{ display:"flex", height:"100vh", fontFamily:"'Segoe UI', Arial, sans-serif", fontSize:13, background:"#f0f2f4" }}>
-      {/* Sidebar */}
+     {/* Version upgrade modal */}
+      {versionModal && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Segoe UI', Arial, sans-serif" }}>
+          <div style={{ background:"#fff", borderRadius:14, padding:32, width:460, boxShadow:"0 12px 48px rgba(0,0,0,0.25)" }}>
+            <div style={{ fontSize:28, marginBottom:12, textAlign:"center" }}>🚀</div>
+            <h3 style={{ margin:"0 0 8px", fontSize:16, color:"#2c3e50", textAlign:"center" }}>App Updated</h3>
+            <p style={{ fontSize:13, color:"#6c757d", lineHeight:1.6, textAlign:"center", margin:"0 0 20px" }}>
+              A new version has been deployed ({versionModal.stored} → <strong>{versionModal.next}</strong>).<br />
+              Would you like to keep your existing data or reset to the seed dataset?
+            </p>
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              <button onClick={handleVersionKeep}
+                style={{ background:"#1a7f8e", color:"#fff", border:"none", borderRadius:8, padding:"12px 20px", fontSize:13, cursor:"pointer", fontWeight:700, textAlign:"left" }}>
+                ✅ Keep existing data
+                <div style={{ fontSize:11, fontWeight:400, opacity:0.85, marginTop:3 }}>Continue with your current projects and settings.</div>
+              </button>
+              <button onClick={handleVersionReset}
+                style={{ background:"#fff", color:"#dc3545", border:"1px solid #dc3545", borderRadius:8, padding:"12px 20px", fontSize:13, cursor:"pointer", fontWeight:700, textAlign:"left" }}>
+                🔄 Reset to seed data
+                <div style={{ fontSize:11, fontWeight:400, color:"#6c757d", marginTop:3 }}>Wipe project data and restore the demo dataset. A backup will be saved first.</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+ {/* Sidebar */}
       <div style={{ width:sidebarOpen?220:48, background:"teal", color:"#fff", display:"flex", flexDirection:"column", transition:"width 0.2s", flexShrink:0, overflow:"hidden" }}>
         <div style={{ padding:"16px 12px", display:"flex", alignItems:"center", gap:10, borderBottom:"1px solid rgba(255,255,255,0.15)" }}>
           <div style={{ width:32, height:32, background:"#fff", borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
