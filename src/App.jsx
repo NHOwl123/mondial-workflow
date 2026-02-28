@@ -1,9 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
 import ProjectTracking from "./ProjectTracking/index.jsx";
+import LoginPage from "./LoginPage.jsx";
+import AdminPage from "./AdminPage.jsx";
+import { loadUsers, saveUsers, resolveSession, logout, fullName, initials } from "./auth.js";
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
-const TEAL = "#1a7f8e";
-const TEAL_DARK = "#145f6b";
+const TEAL       = "#1a7f8e";
+const TEAL_DARK  = "#145f6b";
 const TEAL_LIGHT = "#e8f4f6";
 
 // ─── Workflow data ────────────────────────────────────────────────────────────
@@ -21,13 +24,13 @@ const TASKS = [
   { id: 11, name: "Reports Distributed",                  short: "Distributed" },
 ];
 
-const USERS = [
+const USERS_WF = [
   "Sarah Chen","James Okafor","Priya Nair","Tom Müller",
   "Ana Lima","Fatima Al-Rashid","David Park","Emma Wilson",
 ];
 
-const today      = new Date(2026, 1, 24);
-const fmt        = d => d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+const today         = new Date(2026, 1, 24);
+const fmt           = d => d.toLocaleDateString("en-GB", { day:"2-digit", month:"short" });
 const daysFromToday = n => { const d = new Date(today); d.setDate(d.getDate() + n); return d; };
 
 const ENTITIES = [
@@ -43,180 +46,158 @@ function makeCells() {
   const cells = {};
   ENTITIES.forEach((e, ei) => {
     TASKS.forEach((t, ti) => {
-      const user  = USERS[(ei + ti) % USERS.length];
+      const user = USERS_WF[(ei + ti) % USERS_WF.length];
       let status, dueDate, completedDate, notes = [], attachments = [];
       const r = (ei * 11 + ti) % 17;
-      if      (r < 5)  { status = "complete";  completedDate = fmt(daysFromToday(-3 + (r % 3))); dueDate = fmt(daysFromToday(-5 + (r % 3))); }
-      else if (r < 8)  { status = "overdue";   dueDate = fmt(daysFromToday(-1 - (r % 3))); }
-      else if (r < 11) { status = "due-soon";  dueDate = fmt(daysFromToday(1 + (r % 2))); }
-      else if (r < 14) { status = "on-track";  dueDate = fmt(daysFromToday(5 + (r % 4))); }
+      if      (r < 5)  { status = "complete";  completedDate = fmt(daysFromToday(-3+(r%3))); dueDate = fmt(daysFromToday(-5+(r%3))); }
+      else if (r < 8)  { status = "overdue";   dueDate = fmt(daysFromToday(-1-(r%3))); }
+      else if (r < 11) { status = "due-soon";  dueDate = fmt(daysFromToday(1+(r%2))); }
+      else if (r < 14) { status = "on-track";  dueDate = fmt(daysFromToday(5+(r%4))); }
       else             { status = "unassigned"; dueDate = fmt(daysFromToday(7)); }
-      if (r === 2) notes = [{ user: "Sarah Chen", time: "24 Feb 09:14", text: "Uploaded SAP B1 TB export. Two minor rounding differences noted in accounts 4100 and 5200 — both < £1, marked as explained." }];
-      if (r === 7) notes = [{ user: "Tom Müller",  time: "22 Feb 16:30", text: "EUR/GBP rate source updated to ECB reference. Awaiting confirmation from head office before marking complete." }];
-      cells[`${e}::${t.id}`] = { status, dueDate, completedDate, user: status === "unassigned" ? null : user, notes, attachments };
+      if (r===2) notes = [{ user:"Sarah Chen", time:"24 Feb 09:14", text:"Uploaded SAP B1 TB export. Two minor rounding differences noted — both < £1, marked as explained." }];
+      if (r===7) notes = [{ user:"Tom Müller",  time:"22 Feb 16:30", text:"EUR/GBP rate updated to ECB reference. Awaiting head office confirmation." }];
+      cells[`${e}::${t.id}`] = { status, dueDate, completedDate, user: status==="unassigned" ? null : user, notes, attachments };
     });
   });
   return cells;
 }
 
 const STATUS_STYLES = {
-  complete:        { bg: "#d4edda", color: "#155724", border: "#28a745" },
-  overdue:         { bg: "#f8d7da", color: "#721c24", border: "#dc3545" },
-  "due-soon":      { bg: "#fff3cd", color: "#856404", border: "#ffc107" },
-  "on-track":      { bg: "#f8f9fa", color: "#495057", border: "#dee2e6" },
-  unassigned:      { bg: "#e9ecef", color: "#6c757d", border: "#ced4da" },
-  "not-required":  { bg: "#e8e8f0", color: "#5a5a7a", border: "#9999bb" },
+  complete:       { bg:"#d4edda", color:"#155724", border:"#28a745" },
+  overdue:        { bg:"#f8d7da", color:"#721c24", border:"#dc3545" },
+  "due-soon":     { bg:"#fff3cd", color:"#856404", border:"#ffc107" },
+  "on-track":     { bg:"#f8f9fa", color:"#495057", border:"#dee2e6" },
+  unassigned:     { bg:"#e9ecef", color:"#6c757d", border:"#ced4da" },
+  "not-required": { bg:"#e8e8f0", color:"#5a5a7a", border:"#9999bb" },
 };
 
 // ─── Hierarchy seed data ──────────────────────────────────────────────────────
 const HIERARCHY_TYPES = [
-  { id: "legal",    label: "Legal",    description: "Legal ownership structure for statutory consolidation" },
-  { id: "regional", label: "Regional", description: "Geographic grouping for management reporting" },
-  { id: "industry", label: "Industry", description: "Segment reporting by industry type" },
-  { id: "tax",      label: "Tax",      description: "Tax authority groupings for tax planning" },
+  { id:"legal",    label:"Legal",    description:"Legal ownership structure for statutory consolidation" },
+  { id:"regional", label:"Regional", description:"Geographic grouping for management reporting" },
+  { id:"industry", label:"Industry", description:"Segment reporting by industry type" },
+  { id:"tax",      label:"Tax",      description:"Tax authority groupings for tax planning" },
 ];
 
 const ALL_COMPANIES = [
-  { id: "SEN", name: "Shaneel Enterprises Ltd",                     regNum: "UK 2171783",         country: "UK",      type: "ultimate-parent" },
-  { id: "SAD", name: "SA Designer Parfums Limited",                 regNum: "UK 4198899",         country: "UK",      type: "intermediate"    },
-  { id: "PSH", name: "Perfumeshopping.com Ltd",                     regNum: "UK 3606499",         country: "UK",      type: "subsidiary"      },
-  { id: "SEE", name: "Shaneel Enterprises (Europe) Limited",        regNum: "Malta C103530",      country: "Malta",   type: "intermediate"    },
-  { id: "SMX", name: "Shaneel Mexico Ltd",                          regNum: "UK 12855825",        country: "UK",      type: "intermediate"    },
-  { id: "FEL", name: "Fragrance Expert Ltd",                        regNum: "UK 6005330",         country: "UK",      type: "subsidiary"      },
-  { id: "GFL", name: "Ghost Fragrances Limited",                    regNum: "UK 7904193",         country: "UK",      type: "subsidiary"      },
-  { id: "EAC", name: "E.A. Cosmetics Distribution GmbH",            regNum: "Germany HRB 86497",  country: "Germany", type: "subsidiary"      },
-  { id: "MPL", name: "Mayfair Perfumes Ltd",                        regNum: "UK 3696250",         country: "UK",      type: "subsidiary"      },
-  { id: "SDE", name: "SA Designer Parfums (Europe) Limited",        regNum: "Malta C103547",      country: "Malta",   type: "subsidiary"      },
-  { id: "SDM", name: "Shaneel Designer Parfums Mexico S.A. de C.V.",regNum: "SDP2009224X8",       country: "Mexico",  type: "subsidiary"      },
-  { id: "DMH", name: "Dilesh Mehta",                                regNum: "",                   country: "UK",      type: "ultimate-parent" },
-  { id: "NBH", name: "Nirvana Brands Holdings Ltd",                 regNum: "UK 13550616",        country: "UK",      type: "intermediate"    },
-  { id: "NBW", name: "Nirvana Brands Worldwide Ltd",                regNum: "UK 13552578",        country: "UK",      type: "intermediate"    },
-  { id: "NBL", name: "Nirvana Brands Ltd",                          regNum: "",                   country: "UK",      type: "intermediate"    },
-  { id: "HOW", name: "House of Worth Ltd",                          regNum: "",                   country: "UK",      type: "subsidiary"      },
-  { id: "NBI", name: "Nirvana Brands Inc",                          regNum: "",                   country: "USA",     type: "subsidiary"      },
-  { id: "NBG", name: "Nirvana Beauty GmbH",                         regNum: "Germany HRB 267441", country: "Germany", type: "subsidiary"      },
-  { id: "TBD", name: "The Beautiful Distribution Company Ltd",      regNum: "UK 09119960",        country: "UK",      type: "subsidiary"      },
-  { id: "LDC", name: "The Lovely Distribution Company Limited",     regNum: "",                   country: "UK",      type: "subsidiary"      },
+  { id:"SEN", name:"Shaneel Enterprises Ltd",                     regNum:"UK 2171783",         country:"UK",      type:"ultimate-parent" },
+  { id:"SAD", name:"SA Designer Parfums Limited",                 regNum:"UK 4198899",         country:"UK",      type:"intermediate"    },
+  { id:"PSH", name:"Perfumeshopping.com Ltd",                     regNum:"UK 3606499",         country:"UK",      type:"subsidiary"      },
+  { id:"SEE", name:"Shaneel Enterprises (Europe) Limited",        regNum:"Malta C103530",      country:"Malta",   type:"intermediate"    },
+  { id:"SMX", name:"Shaneel Mexico Ltd",                          regNum:"UK 12855825",        country:"UK",      type:"intermediate"    },
+  { id:"FEL", name:"Fragrance Expert Ltd",                        regNum:"UK 6005330",         country:"UK",      type:"subsidiary"      },
+  { id:"GFL", name:"Ghost Fragrances Limited",                    regNum:"UK 7904193",         country:"UK",      type:"subsidiary"      },
+  { id:"EAC", name:"E.A. Cosmetics Distribution GmbH",            regNum:"Germany HRB 86497",  country:"Germany", type:"subsidiary"      },
+  { id:"MPL", name:"Mayfair Perfumes Ltd",                        regNum:"UK 3696250",         country:"UK",      type:"subsidiary"      },
+  { id:"SDE", name:"SA Designer Parfums (Europe) Limited",        regNum:"Malta C103547",      country:"Malta",   type:"subsidiary"      },
+  { id:"SDM", name:"Shaneel Designer Parfums Mexico S.A. de C.V.",regNum:"SDP2009224X8",       country:"Mexico",  type:"subsidiary"      },
+  { id:"DMH", name:"Dilesh Mehta",                                regNum:"",                   country:"UK",      type:"ultimate-parent" },
+  { id:"NBH", name:"Nirvana Brands Holdings Ltd",                 regNum:"UK 13550616",        country:"UK",      type:"intermediate"    },
+  { id:"NBW", name:"Nirvana Brands Worldwide Ltd",                regNum:"UK 13552578",        country:"UK",      type:"intermediate"    },
+  { id:"NBL", name:"Nirvana Brands Ltd",                          regNum:"",                   country:"UK",      type:"intermediate"    },
+  { id:"HOW", name:"House of Worth Ltd",                          regNum:"",                   country:"UK",      type:"subsidiary"      },
+  { id:"NBI", name:"Nirvana Brands Inc",                          regNum:"",                   country:"USA",     type:"subsidiary"      },
+  { id:"NBG", name:"Nirvana Beauty GmbH",                         regNum:"Germany HRB 267441", country:"Germany", type:"subsidiary"      },
+  { id:"TBD", name:"The Beautiful Distribution Company Ltd",      regNum:"UK 09119960",        country:"UK",      type:"subsidiary"      },
+  { id:"LDC", name:"The Lovely Distribution Company Limited",     regNum:"",                   country:"UK",      type:"subsidiary"      },
 ];
 
 const SEED_RELATIONSHIPS = [
-  { id: "r1",  parentId: "SEN", childId: "SAD", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2010-01-01" },
-  { id: "r2",  parentId: "SEN", childId: "PSH", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2010-01-01" },
-  { id: "r3",  parentId: "SEN", childId: "SEE", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2010-01-01" },
-  { id: "r4",  parentId: "SEN", childId: "SMX", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2010-01-01" },
-  { id: "r5",  parentId: "SEN", childId: "FEL", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2010-01-01" },
-  { id: "r6",  parentId: "SEN", childId: "GFL", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2010-01-01" },
-  { id: "r7",  parentId: "SEN", childId: "EAC", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2010-01-01" },
-  { id: "r8",  parentId: "SEN", childId: "MPL", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2010-01-01" },
-  { id: "r9",  parentId: "SAD", childId: "SDE", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2010-01-01" },
-  { id: "r10", parentId: "SEE", childId: "EAC", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2010-01-01" },
-  { id: "r11", parentId: "SMX", childId: "SDM", directPct: 99.9, hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2010-01-01" },
-  { id: "r12", parentId: "FEL", childId: "MPL", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2010-01-01" },
-  { id: "r13", parentId: "DMH", childId: "NBH", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2021-01-01" },
-  { id: "r14", parentId: "NBH", childId: "NBW", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2021-01-01" },
-  { id: "r15", parentId: "NBH", childId: "NBL", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2021-01-01" },
-  { id: "r16", parentId: "NBW", childId: "HOW", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2021-01-01" },
-  { id: "r17", parentId: "NBL", childId: "NBI", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2021-01-01" },
-  { id: "r18", parentId: "NBL", childId: "NBG", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2021-01-01" },
-  { id: "r19", parentId: "NBL", childId: "TBD", directPct: 100,  hierarchyType: "legal", consolidationMethod: "FULL", effectiveFrom: "2021-01-01" },
+  { id:"r1",  parentId:"SEN", childId:"SAD", directPct:100,  hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2010-01-01" },
+  { id:"r2",  parentId:"SEN", childId:"PSH", directPct:100,  hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2010-01-01" },
+  { id:"r3",  parentId:"SEN", childId:"SEE", directPct:100,  hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2010-01-01" },
+  { id:"r4",  parentId:"SEN", childId:"SMX", directPct:100,  hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2010-01-01" },
+  { id:"r5",  parentId:"SEN", childId:"FEL", directPct:100,  hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2010-01-01" },
+  { id:"r6",  parentId:"SEN", childId:"GFL", directPct:100,  hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2010-01-01" },
+  { id:"r7",  parentId:"SEN", childId:"EAC", directPct:100,  hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2010-01-01" },
+  { id:"r8",  parentId:"SEN", childId:"MPL", directPct:100,  hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2010-01-01" },
+  { id:"r9",  parentId:"SAD", childId:"SDE", directPct:100,  hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2010-01-01" },
+  { id:"r10", parentId:"SEE", childId:"EAC", directPct:100,  hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2010-01-01" },
+  { id:"r11", parentId:"SMX", childId:"SDM", directPct:99.9, hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2010-01-01" },
+  { id:"r12", parentId:"FEL", childId:"MPL", directPct:100,  hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2010-01-01" },
+  { id:"r13", parentId:"DMH", childId:"NBH", directPct:100,  hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2021-01-01" },
+  { id:"r14", parentId:"NBH", childId:"NBW", directPct:100,  hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2021-01-01" },
+  { id:"r15", parentId:"NBH", childId:"NBL", directPct:100,  hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2021-01-01" },
+  { id:"r16", parentId:"NBW", childId:"HOW", directPct:100,  hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2021-01-01" },
+  { id:"r17", parentId:"NBL", childId:"NBI", directPct:100,  hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2021-01-01" },
+  { id:"r18", parentId:"NBL", childId:"NBG", directPct:100,  hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2021-01-01" },
+  { id:"r19", parentId:"NBL", childId:"TBD", directPct:100,  hierarchyType:"legal", consolidationMethod:"FULL", effectiveFrom:"2021-01-01" },
 ];
 
 // ─── Consolidation helpers ────────────────────────────────────────────────────
 function calcUltimateOwnership(relationships, rootId, hierarchyType) {
   const rels = relationships.filter(r => r.hierarchyType === hierarchyType);
   const results = {};
-  function traverse(currentId, runningPct) {
-    rels.filter(r => r.parentId === currentId).forEach(r => {
-      const contrib = (runningPct * r.directPct) / 100;
-      results[r.childId] = (results[r.childId] || 0) + contrib;
-      traverse(r.childId, contrib);
+  function traverse(id, pct) {
+    rels.filter(r => r.parentId === id).forEach(r => {
+      const c = (pct * r.directPct) / 100;
+      results[r.childId] = (results[r.childId] || 0) + c;
+      traverse(r.childId, c);
     });
   }
   traverse(rootId, 100);
   return results;
 }
-
-function suggestMethod(pct) {
-  if (pct > 50)  return "FULL";
-  if (pct >= 20) return "EQUITY";
-  return "NONE";
-}
+function suggestMethod(pct) { return pct > 50 ? "FULL" : pct >= 20 ? "EQUITY" : "NONE"; }
 
 // ─── Storage helpers ──────────────────────────────────────────────────────────
-const STORAGE_KEY = "mondial-hierarchies-v1";
-
+const HIER_KEY = "mondial-hierarchies-v1";
 async function loadHierarchyData() {
-  try { const r = await window.storage.get(STORAGE_KEY, true); return r ? JSON.parse(r.value) : null; }
-  catch { return null; }
+  try { const r = await window.storage.get(HIER_KEY, true); return r ? JSON.parse(r.value) : null; } catch { return null; }
 }
 async function saveHierarchyData(data) {
-  try { await window.storage.set(STORAGE_KEY, JSON.stringify(data), true); }
-  catch (e) { console.error("Storage save failed", e); }
+  try { await window.storage.set(HIER_KEY, JSON.stringify(data), true); } catch (e) { console.error(e); }
 }
 
-// ─── Badge components ─────────────────────────────────────────────────────────
+// ─── Small shared components ──────────────────────────────────────────────────
 function CompanyBadge({ type }) {
-  const map = {
-    "ultimate-parent": { label: "Ultimate Parent", bg: TEAL,      color: "#fff" },
-    "intermediate":    { label: "Intermediate",    bg: "#6f42c1", color: "#fff" },
-    "subsidiary":      { label: "Subsidiary",      bg: "#6c757d", color: "#fff" },
-  };
+  const map = { "ultimate-parent":{ label:"Ultimate Parent", bg:TEAL, color:"#fff" }, "intermediate":{ label:"Intermediate", bg:"#6f42c1", color:"#fff" }, "subsidiary":{ label:"Subsidiary", bg:"#6c757d", color:"#fff" } };
   const s = map[type] || map["subsidiary"];
   return <span style={{ fontSize:9, padding:"2px 6px", borderRadius:10, background:s.bg, color:s.color, fontWeight:700, whiteSpace:"nowrap" }}>{s.label}</span>;
 }
-
 function MethodBadge({ method }) {
-  const map = {
-    FULL:   { bg: "#d4edda", color: "#155724", border: "#28a745" },
-    EQUITY: { bg: "#fff3cd", color: "#856404", border: "#ffc107" },
-    NONE:   { bg: "#e9ecef", color: "#6c757d", border: "#ced4da" },
-  };
+  const map = { FULL:{ bg:"#d4edda", color:"#155724", border:"#28a745" }, EQUITY:{ bg:"#fff3cd", color:"#856404", border:"#ffc107" }, NONE:{ bg:"#e9ecef", color:"#6c757d", border:"#ced4da" } };
   const s = map[method] || map.NONE;
   return <span style={{ fontSize:10, padding:"2px 8px", borderRadius:10, background:s.bg, color:s.color, border:`1px solid ${s.border}`, fontWeight:700 }}>{method}</span>;
 }
 
-// ─── Tree node ────────────────────────────────────────────────────────────────
-function TreeNode({ companyId, companies, relationships, hierarchyType, depth = 0, ultimateOwnership }) {
+function TreeNode({ companyId, companies, relationships, hierarchyType, depth=0, ultimateOwnership }) {
   const [collapsed, setCollapsed] = useState(false);
   const co = companies.find(c => c.id === companyId);
   if (!co) return null;
   const children = relationships.filter(r => r.parentId === companyId && r.hierarchyType === hierarchyType);
   const ult = ultimateOwnership?.[companyId];
-
   return (
-    <div style={{ marginLeft: depth === 0 ? 0 : 24, position: "relative" }}>
-      {depth > 0 && <div style={{ position:"absolute", left:-16, top:0, bottom:0, borderLeft:"2px dashed #ced4da" }} />}
+    <div style={{ marginLeft: depth===0 ? 0 : 24, position:"relative" }}>
+      {depth>0 && <div style={{ position:"absolute", left:-16, top:0, bottom:0, borderLeft:"2px dashed #ced4da" }} />}
       <div style={{ display:"flex", alignItems:"flex-start", gap:8, marginBottom:6, position:"relative" }}>
-        {depth > 0 && <div style={{ position:"absolute", left:-16, top:18, width:16, borderTop:"2px dashed #ced4da" }} />}
-        {children.length > 0
-          ? <button onClick={() => setCollapsed(p => !p)} style={{ width:18, height:18, borderRadius:3, border:"1px solid #ced4da", background:"#fff", cursor:"pointer", fontSize:10, flexShrink:0, marginTop:10, display:"flex", alignItems:"center", justifyContent:"center" }}>{collapsed ? "+" : "−"}</button>
+        {depth>0 && <div style={{ position:"absolute", left:-16, top:18, width:16, borderTop:"2px dashed #ced4da" }} />}
+        {children.length>0
+          ? <button onClick={()=>setCollapsed(p=>!p)} style={{ width:18, height:18, borderRadius:3, border:"1px solid #ced4da", background:"#fff", cursor:"pointer", fontSize:10, flexShrink:0, marginTop:10, display:"flex", alignItems:"center", justifyContent:"center" }}>{collapsed?"+":" −"}</button>
           : <div style={{ width:18, flexShrink:0 }} />}
-        <div style={{ background:"#fff", border:`2px solid ${depth === 0 ? TEAL : "#ced4da"}`, borderRadius:8, padding:"8px 12px", minWidth:220, maxWidth:340, boxShadow: depth === 0 ? "0 2px 6px rgba(0,0,0,0.1)" : "none" }}>
-          <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:4 }}>
-            <span style={{ fontWeight:700, fontSize:12, color:"#2c3e50" }}>{co.name}</span>
-          </div>
+        <div style={{ background:"#fff", border:`2px solid ${depth===0?TEAL:"#ced4da"}`, borderRadius:8, padding:"8px 12px", minWidth:220, maxWidth:340, boxShadow:depth===0?"0 2px 6px rgba(0,0,0,0.1)":"none" }}>
+          <div style={{ fontWeight:700, fontSize:12, color:"#2c3e50", marginBottom:4 }}>{co.name}</div>
           <div style={{ display:"flex", flexWrap:"wrap", gap:4, alignItems:"center" }}>
             <CompanyBadge type={co.type} />
             <span style={{ fontSize:10, color:"#6c757d" }}>{co.country}</span>
             {co.regNum && <span style={{ fontSize:9, color:"#adb5bd" }}>{co.regNum}</span>}
-            {ult !== undefined && depth > 0 && <span style={{ fontSize:10, color:TEAL_DARK, fontWeight:600 }}>Ult: {ult.toFixed(2)}%</span>}
+            {ult!==undefined && depth>0 && <span style={{ fontSize:10, color:TEAL_DARK, fontWeight:600 }}>Ult: {ult.toFixed(2)}%</span>}
           </div>
         </div>
       </div>
-      {!collapsed && children.map(r => (
+      {!collapsed && children.map(r=>(
         <div key={r.id} style={{ marginLeft:26 }}>
           <div style={{ fontSize:10, color:"#6c757d", marginBottom:2, marginLeft:18, display:"flex", gap:8 }}>
             <span>Direct: <strong>{r.directPct}%</strong></span>
             <MethodBadge method={r.consolidationMethod} />
           </div>
-          <TreeNode companyId={r.childId} companies={companies} relationships={relationships} hierarchyType={hierarchyType} depth={depth + 1} ultimateOwnership={ultimateOwnership} />
+          <TreeNode companyId={r.childId} companies={companies} relationships={relationships} hierarchyType={hierarchyType} depth={depth+1} ultimateOwnership={ultimateOwnership} />
         </div>
       ))}
     </div>
   );
 }
 
-// ─── Hierarchies page ─────────────────────────────────────────────────────────
 function HierarchiesPage({ companies, setCompanies, relationships, setRelationships, hierarchyTypes, setHierarchyTypes }) {
   const [activeHType, setActiveHType] = useState("legal");
   const [view, setView]               = useState("tree");
@@ -224,121 +205,73 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
   const [showAddCo,  setShowAddCo]    = useState(false);
   const [showAddHT,  setShowAddHT]    = useState(false);
   const [editRel, setEditRel]         = useState(null);
-  const [newRel, setNewRel]           = useState({ parentId:"", childId:"", directPct:100, consolidationMethod:"FULL", effectiveFrom:"2024-01-01" });
-  const [newCo,  setNewCo]            = useState({ name:"", regNum:"", country:"", type:"subsidiary" });
-  const [newHT,  setNewHT]            = useState({ id:"", label:"", description:"" });
+  const [newRel,  setNewRel]          = useState({ parentId:"", childId:"", directPct:100, consolidationMethod:"FULL", effectiveFrom:"2024-01-01" });
+  const [newCo,   setNewCo]           = useState({ name:"", regNum:"", country:"", type:"subsidiary" });
+  const [newHT,   setNewHT]           = useState({ id:"", label:"", description:"" });
   const [filterRoot, setFilterRoot]   = useState("ALL");
 
   const hRels     = relationships.filter(r => r.hierarchyType === activeHType);
   const childIds  = new Set(hRels.map(r => r.childId));
   const parentIds = new Set(hRels.map(r => r.parentId));
   const rootCos   = companies.filter(c => parentIds.has(c.id) && !childIds.has(c.id));
-  const roots     = rootCos.length > 0 ? rootCos : companies.filter(c => c.type === "ultimate-parent");
+  const roots     = rootCos.length>0 ? rootCos : companies.filter(c => c.type==="ultimate-parent");
 
   const ultimateOwnershipByRoot = useMemo(() => {
     const combined = {};
-    roots.forEach(r => {
-      Object.entries(calcUltimateOwnership(relationships, r.id, activeHType)).forEach(([id, pct]) => {
-        combined[id] = (combined[id] || 0) + pct;
-      });
-    });
+    roots.forEach(r => { Object.entries(calcUltimateOwnership(relationships, r.id, activeHType)).forEach(([id,pct]) => { combined[id] = (combined[id]||0)+pct; }); });
     return combined;
   }, [relationships, roots, activeHType]);
 
-  const inp  = { border:"1px solid #ced4da", borderRadius:4, padding:"6px 10px", fontSize:12, width:"100%", boxSizing:"border-box" };
-  const lbl  = { fontSize:11, color:"#6c757d", fontWeight:600, marginBottom:3, display:"block" };
-  const btnP = { background:TEAL, color:"#fff", border:"none", borderRadius:5, padding:"7px 16px", fontSize:12, cursor:"pointer", fontWeight:600 };
-  const btnG = { background:"#f8f9fa", color:"#495057", border:"1px solid #ced4da", borderRadius:5, padding:"7px 16px", fontSize:12, cursor:"pointer", fontWeight:600 };
-  const btnD = { background:"#fff", color:"#dc3545", border:"1px solid #dc3545", borderRadius:5, padding:"4px 10px", fontSize:11, cursor:"pointer" };
+  const i  = { border:"1px solid #ced4da", borderRadius:4, padding:"6px 10px", fontSize:12, width:"100%", boxSizing:"border-box" };
+  const l  = { fontSize:11, color:"#6c757d", fontWeight:600, marginBottom:3, display:"block" };
+  const bP = { background:TEAL, color:"#fff", border:"none", borderRadius:5, padding:"7px 16px", fontSize:12, cursor:"pointer", fontWeight:600 };
+  const bG = { background:"#f8f9fa", color:"#495057", border:"1px solid #ced4da", borderRadius:5, padding:"7px 16px", fontSize:12, cursor:"pointer", fontWeight:600 };
+  const bD = { background:"#fff", color:"#dc3545", border:"1px solid #dc3545", borderRadius:5, padding:"4px 10px", fontSize:11, cursor:"pointer" };
 
-  function addRelationship() {
-    if (!newRel.parentId || !newRel.childId || newRel.parentId === newRel.childId) return;
-    setRelationships(prev => [...prev, { ...newRel, id:"r"+Date.now(), hierarchyType:activeHType, directPct:parseFloat(newRel.directPct)||0 }]);
-    setNewRel({ parentId:"", childId:"", directPct:100, consolidationMethod:"FULL", effectiveFrom:"2024-01-01" });
-    setShowAddRel(false);
-  }
-  function updateRelationship() {
-    if (!editRel) return;
-    setRelationships(prev => prev.map(r => r.id === editRel.id ? { ...editRel, directPct:parseFloat(editRel.directPct)||0 } : r));
-    setEditRel(null);
-  }
-  function addCompany() {
-    if (!newCo.name.trim()) return;
-    setCompanies(prev => [...prev, { ...newCo, id:"CO"+Date.now(), name:newCo.name.trim() }]);
-    setNewCo({ name:"", regNum:"", country:"", type:"subsidiary" });
-    setShowAddCo(false);
-  }
-  function addHierarchyType() {
-    if (!newHT.id.trim() || !newHT.label.trim()) return;
-    setHierarchyTypes(prev => [...prev, { ...newHT }]);
-    setNewHT({ id:"", label:"", description:"" });
-    setShowAddHT(false);
-  }
-
-  const displayedRoots = filterRoot === "ALL" ? roots : roots.filter(r => r.id === filterRoot);
+  const displayedRoots = filterRoot==="ALL" ? roots : roots.filter(r=>r.id===filterRoot);
 
   return (
     <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", padding:16, gap:12 }}>
-      {/* Header */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
         <div>
           <h2 style={{ margin:0, fontSize:18, color:"#2c3e50", fontWeight:700 }}>Group Hierarchies</h2>
-          <p style={{ margin:"4px 0 0", fontSize:12, color:"#6c757d" }}>Define parent-child relationships. Used for consolidation scope in report generation.</p>
+          <p style={{ margin:"4px 0 0", fontSize:12, color:"#6c757d" }}>Define parent-child relationships for consolidation scope.</p>
         </div>
         <div style={{ display:"flex", gap:8 }}>
-          <button onClick={() => setShowAddHT(true)}  style={btnG}>+ Hierarchy Type</button>
-          <button onClick={() => setShowAddCo(true)}  style={btnG}>+ Company</button>
-          <button onClick={() => setShowAddRel(true)} style={btnP}>+ Add Relationship</button>
+          <button onClick={()=>setShowAddHT(true)}  style={bG}>+ Hierarchy Type</button>
+          <button onClick={()=>setShowAddCo(true)}  style={bG}>+ Company</button>
+          <button onClick={()=>setShowAddRel(true)} style={bP}>+ Add Relationship</button>
         </div>
       </div>
-
-      {/* Hierarchy type tabs */}
-      <div style={{ display:"flex", gap:0, background:"#fff", borderRadius:8, border:"1px solid #dee2e6", overflow:"hidden", flexShrink:0 }}>
-        {hierarchyTypes.map(ht => (
-          <button key={ht.id} onClick={() => setActiveHType(ht.id)}
-            style={{ flex:1, padding:"10px 16px", border:"none", borderRight:"1px solid #dee2e6", cursor:"pointer", fontSize:12, fontWeight:600,
-              background: activeHType === ht.id ? TEAL : "#fff",
-              color:      activeHType === ht.id ? "#fff" : "#495057" }}>
-            {ht.label}
-            <div style={{ fontSize:10, fontWeight:400, opacity:0.8, marginTop:2 }}>{ht.description}</div>
+      <div style={{ display:"flex", background:"#fff", borderRadius:8, border:"1px solid #dee2e6", overflow:"hidden", flexShrink:0 }}>
+        {hierarchyTypes.map(ht=>(
+          <button key={ht.id} onClick={()=>setActiveHType(ht.id)} style={{ flex:1, padding:"10px 16px", border:"none", borderRight:"1px solid #dee2e6", cursor:"pointer", fontSize:12, fontWeight:600, background:activeHType===ht.id?TEAL:"#fff", color:activeHType===ht.id?"#fff":"#495057" }}>
+            {ht.label}<div style={{ fontSize:10, fontWeight:400, opacity:0.8, marginTop:2 }}>{ht.description}</div>
           </button>
         ))}
       </div>
-
-      {/* View toggle */}
       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-        {["tree","table","companies"].map(v => (
-          <button key={v} onClick={() => setView(v)}
-            style={{ padding:"6px 14px", border:"1px solid #ced4da", borderRadius:5, fontSize:12, cursor:"pointer", fontWeight:600,
-              background:   view === v ? TEAL_LIGHT : "#fff",
-              color:        view === v ? TEAL_DARK  : "#495057",
-              borderColor:  view === v ? TEAL       : "#ced4da" }}>
-            {v === "tree" ? "🌳 Tree View" : v === "table" ? "📋 Relationship Table" : "🏢 Companies"}
+        {["tree","table","companies"].map(v=>(
+          <button key={v} onClick={()=>setView(v)} style={{ padding:"6px 14px", border:`1px solid ${view===v?TEAL:"#ced4da"}`, borderRadius:5, fontSize:12, cursor:"pointer", fontWeight:600, background:view===v?TEAL_LIGHT:"#fff", color:view===v?TEAL_DARK:"#495057" }}>
+            {v==="tree"?"🌳 Tree View":v==="table"?"📋 Relationship Table":"🏢 Companies"}
           </button>
         ))}
-        {view === "tree" && roots.length > 1 && (
+        {view==="tree" && roots.length>1 && (
           <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:6 }}>
             <span style={{ fontSize:12, color:"#6c757d" }}>Root:</span>
-            <select value={filterRoot} onChange={e => setFilterRoot(e.target.value)} style={{ border:"1px solid #ced4da", borderRadius:4, padding:"4px 8px", fontSize:12 }}>
+            <select value={filterRoot} onChange={e=>setFilterRoot(e.target.value)} style={{ border:"1px solid #ced4da", borderRadius:4, padding:"4px 8px", fontSize:12 }}>
               <option value="ALL">All</option>
-              {roots.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              {roots.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           </div>
         )}
-        <div style={{ marginLeft: view === "tree" ? 0 : "auto", fontSize:11, color:"#6c757d" }}>{hRels.length} relationship{hRels.length !== 1 ? "s" : ""} defined</div>
+        <div style={{ marginLeft:view==="tree"?0:"auto", fontSize:11, color:"#6c757d" }}>{hRels.length} relationship{hRels.length!==1?"s":""} defined</div>
       </div>
-
-      {/* Content */}
       <div style={{ flex:1, overflow:"auto", background:"#fff", borderRadius:8, border:"1px solid #dee2e6", padding:20 }}>
-        {view === "tree" && (
+        {view==="tree" && (
           <div>
-            {hRels.length === 0 && (
-              <div style={{ textAlign:"center", padding:40, color:"#6c757d", fontSize:13 }}>
-                No relationships defined for this hierarchy type yet.<br />
-                <button onClick={() => setShowAddRel(true)} style={{ ...btnP, marginTop:12 }}>+ Add First Relationship</button>
-              </div>
-            )}
-            {displayedRoots.map(root => (
+            {hRels.length===0 && <div style={{ textAlign:"center", padding:40, color:"#6c757d", fontSize:13 }}>No relationships defined.<br /><button onClick={()=>setShowAddRel(true)} style={{ ...bP, marginTop:12 }}>+ Add First Relationship</button></div>}
+            {displayedRoots.map(root=>(
               <div key={root.id} style={{ marginBottom:32 }}>
                 <div style={{ fontSize:11, color:"#6c757d", fontWeight:600, marginBottom:8, textTransform:"uppercase", letterSpacing:0.5 }}>Group: {root.name}</div>
                 <TreeNode companyId={root.id} companies={companies} relationships={relationships} hierarchyType={activeHType} depth={0} ultimateOwnership={ultimateOwnershipByRoot} />
@@ -346,35 +279,26 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
             ))}
           </div>
         )}
-
-        {view === "table" && (
+        {view==="table" && (
           <div>
             <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
-              <thead>
-                <tr style={{ background:TEAL, color:"#fff" }}>
-                  {["Parent Company","Child Company","Direct %","Ultimate %","Method","Effective From",""].map(h => (
-                    <th key={h} style={{ padding:"10px 12px", textAlign:"left", fontWeight:600, fontSize:11 }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
+              <thead><tr style={{ background:TEAL, color:"#fff" }}>{["Parent","Child","Direct %","Ultimate %","Method","Effective From",""].map(h=><th key={h} style={{ padding:"10px 12px", textAlign:"left", fontWeight:600, fontSize:11 }}>{h}</th>)}</tr></thead>
               <tbody>
-                {hRels.length === 0 && <tr><td colSpan={7} style={{ padding:24, textAlign:"center", color:"#6c757d" }}>No relationships defined.</td></tr>}
-                {hRels.map((r, i) => {
-                  const parent = companies.find(c => c.id === r.parentId);
-                  const child  = companies.find(c => c.id === r.childId);
-                  const ult    = ultimateOwnershipByRoot[r.childId];
+                {hRels.length===0 && <tr><td colSpan={7} style={{ padding:24, textAlign:"center", color:"#6c757d" }}>No relationships defined.</td></tr>}
+                {hRels.map((r,idx)=>{
+                  const parent=companies.find(c=>c.id===r.parentId); const child=companies.find(c=>c.id===r.childId); const ult=ultimateOwnershipByRoot[r.childId];
                   return (
-                    <tr key={r.id} style={{ background: i%2===0 ? "#fff" : "#f8f9fa", borderBottom:"1px solid #dee2e6" }}>
-                      <td style={{ padding:"10px 12px", fontWeight:600, color:"#2c3e50" }}>{parent?.name || r.parentId}</td>
-                      <td style={{ padding:"10px 12px", color:"#495057" }}>{child?.name || r.childId}</td>
+                    <tr key={r.id} style={{ background:idx%2===0?"#fff":"#f8f9fa", borderBottom:"1px solid #dee2e6" }}>
+                      <td style={{ padding:"10px 12px", fontWeight:600, color:"#2c3e50" }}>{parent?.name||r.parentId}</td>
+                      <td style={{ padding:"10px 12px", color:"#495057" }}>{child?.name||r.childId}</td>
                       <td style={{ padding:"10px 12px", textAlign:"center", fontWeight:700, color:TEAL_DARK }}>{r.directPct}%</td>
-                      <td style={{ padding:"10px 12px", textAlign:"center", color:"#6c757d" }}>{ult !== undefined ? `${ult.toFixed(2)}%` : "—"}</td>
+                      <td style={{ padding:"10px 12px", textAlign:"center", color:"#6c757d" }}>{ult!==undefined?`${ult.toFixed(2)}%`:"—"}</td>
                       <td style={{ padding:"10px 12px" }}><MethodBadge method={r.consolidationMethod} /></td>
                       <td style={{ padding:"10px 12px", color:"#6c757d" }}>{r.effectiveFrom}</td>
                       <td style={{ padding:"10px 12px" }}>
                         <div style={{ display:"flex", gap:6 }}>
-                          <button onClick={() => setEditRel({...r})} style={{ ...btnG, padding:"3px 10px", fontSize:11 }}>Edit</button>
-                          <button onClick={() => setRelationships(prev => prev.filter(x => x.id !== r.id))} style={btnD}>Delete</button>
+                          <button onClick={()=>setEditRel({...r})} style={{ ...bG, padding:"3px 10px", fontSize:11 }}>Edit</button>
+                          <button onClick={()=>setRelationships(p=>p.filter(x=>x.id!==r.id))} style={bD}>Delete</button>
                         </div>
                       </td>
                     </tr>
@@ -382,149 +306,84 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
                 })}
               </tbody>
             </table>
-            {hRels.length > 0 && (
-              <div style={{ marginTop:24 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:"#2c3e50", marginBottom:10 }}>Computed Ultimate Ownership</div>
-                <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
-                  <thead>
-                    <tr style={{ background:TEAL_LIGHT }}>
-                      {["Company","Ultimate %","Suggested Method"].map(h => (
-                        <th key={h} style={{ padding:"8px 12px", textAlign:"left", fontWeight:600, fontSize:11, color:TEAL_DARK, borderBottom:`2px solid ${TEAL}` }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(ultimateOwnershipByRoot).sort((a,b) => b[1]-a[1]).map(([id, pct], i) => {
-                      const co = companies.find(c => c.id === id);
-                      return (
-                        <tr key={id} style={{ background: i%2===0 ? "#fff" : "#f8f9fa", borderBottom:"1px solid #dee2e6" }}>
-                          <td style={{ padding:"8px 12px", fontWeight:600, color:"#2c3e50" }}>{co?.name || id}</td>
-                          <td style={{ padding:"8px 12px", fontWeight:700, color:TEAL_DARK }}>{pct.toFixed(2)}%</td>
-                          <td style={{ padding:"8px 12px" }}><MethodBadge method={suggestMethod(pct)} /></td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </div>
         )}
-
-        {view === "companies" && (
+        {view==="companies" && (
           <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
-            <thead>
-              <tr style={{ background:TEAL, color:"#fff" }}>
-                {["Company Name","Reg. Number","Country","Type"].map(h => (
-                  <th key={h} style={{ padding:"10px 12px", textAlign:"left", fontWeight:600, fontSize:11 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {companies.map((co, i) => (
-                <tr key={co.id} style={{ background: i%2===0 ? "#fff" : "#f8f9fa", borderBottom:"1px solid #dee2e6" }}>
-                  <td style={{ padding:"10px 12px", fontWeight:600, color:"#2c3e50" }}>{co.name}</td>
-                  <td style={{ padding:"10px 12px", color:"#6c757d" }}>{co.regNum || "—"}</td>
-                  <td style={{ padding:"10px 12px", color:"#495057" }}>{co.country || "—"}</td>
-                  <td style={{ padding:"10px 12px" }}><CompanyBadge type={co.type} /></td>
-                </tr>
-              ))}
-            </tbody>
+            <thead><tr style={{ background:TEAL, color:"#fff" }}>{["Company Name","Reg. Number","Country","Type"].map(h=><th key={h} style={{ padding:"10px 12px", textAlign:"left", fontWeight:600, fontSize:11 }}>{h}</th>)}</tr></thead>
+            <tbody>{companies.map((co,idx)=><tr key={co.id} style={{ background:idx%2===0?"#fff":"#f8f9fa", borderBottom:"1px solid #dee2e6" }}><td style={{ padding:"10px 12px", fontWeight:600, color:"#2c3e50" }}>{co.name}</td><td style={{ padding:"10px 12px", color:"#6c757d" }}>{co.regNum||"—"}</td><td style={{ padding:"10px 12px", color:"#495057" }}>{co.country||"—"}</td><td style={{ padding:"10px 12px" }}><CompanyBadge type={co.type} /></td></tr>)}</tbody>
           </table>
         )}
       </div>
 
-      {/* Modals */}
-      {(showAddRel || editRel) && (
+      {/* Relationship modal */}
+      {(showAddRel||editRel) && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center" }}>
           <div style={{ background:"#fff", borderRadius:10, padding:28, width:480, boxShadow:"0 8px 32px rgba(0,0,0,0.2)" }}>
-            <h3 style={{ margin:"0 0 20px", fontSize:16, color:"#2c3e50" }}>{editRel ? "Edit Relationship" : "Add Relationship"}</h3>
+            <h3 style={{ margin:"0 0 20px", fontSize:16, color:"#2c3e50" }}>{editRel?"Edit Relationship":"Add Relationship"}</h3>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
-              {[["parentId","Parent Company"],["childId","Child Company"]].map(([field, label]) => (
-                <div key={field}>
-                  <label style={lbl}>{label}</label>
-                  <select value={editRel ? editRel[field] : newRel[field]}
-                    onChange={e => editRel ? setEditRel(p=>({...p,[field]:e.target.value})) : setNewRel(p=>({...p,[field]:e.target.value}))}
-                    style={inp}>
-                    <option value="">— Select —</option>
-                    {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {[["parentId","Parent Company"],["childId","Child Company"]].map(([field,label])=>(
+                <div key={field}><label style={l}>{label}</label>
+                  <select value={editRel?editRel[field]:newRel[field]} onChange={e=>editRel?setEditRel(p=>({...p,[field]:e.target.value})):setNewRel(p=>({...p,[field]:e.target.value}))} style={i}>
+                    <option value="">— Select —</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
               ))}
-              <div>
-                <label style={lbl}>Direct Ownership %</label>
-                <input type="number" min="0" max="100" step="0.1"
-                  value={editRel ? editRel.directPct : newRel.directPct}
-                  onChange={e => {
-                    const v = e.target.value;
-                    const m = suggestMethod(parseFloat(v));
-                    editRel ? setEditRel(p=>({...p,directPct:v,consolidationMethod:m})) : setNewRel(p=>({...p,directPct:v,consolidationMethod:m}));
-                  }}
-                  style={inp} />
+              <div><label style={l}>Direct %</label>
+                <input type="number" min="0" max="100" step="0.1" value={editRel?editRel.directPct:newRel.directPct}
+                  onChange={e=>{const v=e.target.value,m=suggestMethod(parseFloat(v)); editRel?setEditRel(p=>({...p,directPct:v,consolidationMethod:m})):setNewRel(p=>({...p,directPct:v,consolidationMethod:m}));}} style={i} />
               </div>
-              <div>
-                <label style={lbl}>Consolidation Method</label>
-                <select value={editRel ? editRel.consolidationMethod : newRel.consolidationMethod}
-                  onChange={e => editRel ? setEditRel(p=>({...p,consolidationMethod:e.target.value})) : setNewRel(p=>({...p,consolidationMethod:e.target.value}))}
-                  style={inp}>
-                  <option value="FULL">FULL — Full consolidation (&gt;50%)</option>
-                  <option value="EQUITY">EQUITY — Equity method (20–50%)</option>
-                  <option value="NONE">NONE — No consolidation (&lt;20%)</option>
+              <div><label style={l}>Method</label>
+                <select value={editRel?editRel.consolidationMethod:newRel.consolidationMethod} onChange={e=>editRel?setEditRel(p=>({...p,consolidationMethod:e.target.value})):setNewRel(p=>({...p,consolidationMethod:e.target.value}))} style={i}>
+                  <option value="FULL">FULL</option><option value="EQUITY">EQUITY</option><option value="NONE">NONE</option>
                 </select>
               </div>
-              <div style={{ gridColumn:"1 / -1" }}>
-                <label style={lbl}>Effective From</label>
-                <input type="date" value={editRel ? editRel.effectiveFrom : newRel.effectiveFrom}
-                  onChange={e => editRel ? setEditRel(p=>({...p,effectiveFrom:e.target.value})) : setNewRel(p=>({...p,effectiveFrom:e.target.value}))}
-                  style={{ ...inp, width:"50%" }} />
+              <div style={{ gridColumn:"1/-1" }}><label style={l}>Effective From</label>
+                <input type="date" value={editRel?editRel.effectiveFrom:newRel.effectiveFrom} onChange={e=>editRel?setEditRel(p=>({...p,effectiveFrom:e.target.value})):setNewRel(p=>({...p,effectiveFrom:e.target.value}))} style={{ ...i, width:"50%" }} />
               </div>
             </div>
             <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:22 }}>
-              <button onClick={() => { setShowAddRel(false); setEditRel(null); }} style={btnG}>Cancel</button>
-              <button onClick={editRel ? updateRelationship : addRelationship} style={btnP}>{editRel ? "Save Changes" : "Add Relationship"}</button>
+              <button onClick={()=>{setShowAddRel(false);setEditRel(null);}} style={bG}>Cancel</button>
+              <button onClick={editRel?()=>{setRelationships(p=>p.map(r=>r.id===editRel.id?{...editRel,directPct:parseFloat(editRel.directPct)||0}:r));setEditRel(null);}:()=>{if(!newRel.parentId||!newRel.childId||newRel.parentId===newRel.childId)return;setRelationships(p=>[...p,{...newRel,id:"r"+Date.now(),hierarchyType:activeHType,directPct:parseFloat(newRel.directPct)||0}]);setNewRel({parentId:"",childId:"",directPct:100,consolidationMethod:"FULL",effectiveFrom:"2024-01-01"});setShowAddRel(false);}} style={bP}>{editRel?"Save":"Add"}</button>
             </div>
           </div>
         </div>
       )}
-
       {showAddCo && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center" }}>
           <div style={{ background:"#fff", borderRadius:10, padding:28, width:440, boxShadow:"0 8px 32px rgba(0,0,0,0.2)" }}>
-            <h3 style={{ margin:"0 0 20px", fontSize:16, color:"#2c3e50" }}>Add Company</h3>
+            <h3 style={{ margin:"0 0 20px", fontSize:16 }}>Add Company</h3>
             <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-              <div><label style={lbl}>Company Name *</label><input value={newCo.name} onChange={e=>setNewCo(p=>({...p,name:e.target.value}))} style={inp} /></div>
+              <div><label style={l}>Name *</label><input value={newCo.name} onChange={e=>setNewCo(p=>({...p,name:e.target.value}))} style={i} /></div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-                <div><label style={lbl}>Registration Number</label><input value={newCo.regNum} onChange={e=>setNewCo(p=>({...p,regNum:e.target.value}))} style={inp} /></div>
-                <div><label style={lbl}>Country</label><input value={newCo.country} onChange={e=>setNewCo(p=>({...p,country:e.target.value}))} style={inp} /></div>
+                <div><label style={l}>Reg. Number</label><input value={newCo.regNum} onChange={e=>setNewCo(p=>({...p,regNum:e.target.value}))} style={i} /></div>
+                <div><label style={l}>Country</label><input value={newCo.country} onChange={e=>setNewCo(p=>({...p,country:e.target.value}))} style={i} /></div>
               </div>
-              <div><label style={lbl}>Company Type</label>
-                <select value={newCo.type} onChange={e=>setNewCo(p=>({...p,type:e.target.value}))} style={inp}>
-                  <option value="ultimate-parent">Ultimate Parent</option>
-                  <option value="intermediate">Intermediate Holding</option>
-                  <option value="subsidiary">Subsidiary</option>
+              <div><label style={l}>Type</label>
+                <select value={newCo.type} onChange={e=>setNewCo(p=>({...p,type:e.target.value}))} style={i}>
+                  <option value="ultimate-parent">Ultimate Parent</option><option value="intermediate">Intermediate</option><option value="subsidiary">Subsidiary</option>
                 </select>
               </div>
             </div>
             <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:22 }}>
-              <button onClick={() => setShowAddCo(false)} style={btnG}>Cancel</button>
-              <button onClick={addCompany} style={btnP}>Add Company</button>
+              <button onClick={()=>setShowAddCo(false)} style={bG}>Cancel</button>
+              <button onClick={()=>{if(!newCo.name.trim())return;setCompanies(p=>[...p,{...newCo,id:"CO"+Date.now(),name:newCo.name.trim()}]);setNewCo({name:"",regNum:"",country:"",type:"subsidiary"});setShowAddCo(false);}} style={bP}>Add</button>
             </div>
           </div>
         </div>
       )}
-
       {showAddHT && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center" }}>
           <div style={{ background:"#fff", borderRadius:10, padding:28, width:420, boxShadow:"0 8px 32px rgba(0,0,0,0.2)" }}>
-            <h3 style={{ margin:"0 0 20px", fontSize:16, color:"#2c3e50" }}>Add Hierarchy Type</h3>
+            <h3 style={{ margin:"0 0 20px", fontSize:16 }}>Add Hierarchy Type</h3>
             <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-              <div><label style={lbl}>ID (lowercase, no spaces) *</label><input value={newHT.id} onChange={e=>setNewHT(p=>({...p,id:e.target.value.toLowerCase().replace(/\s/g,"")}))} style={inp} /></div>
-              <div><label style={lbl}>Display Label *</label><input value={newHT.label} onChange={e=>setNewHT(p=>({...p,label:e.target.value}))} style={inp} /></div>
-              <div><label style={lbl}>Description</label><input value={newHT.description} onChange={e=>setNewHT(p=>({...p,description:e.target.value}))} style={inp} /></div>
+              <div><label style={l}>ID *</label><input value={newHT.id} onChange={e=>setNewHT(p=>({...p,id:e.target.value.toLowerCase().replace(/\s/g,"")}))} style={i} /></div>
+              <div><label style={l}>Label *</label><input value={newHT.label} onChange={e=>setNewHT(p=>({...p,label:e.target.value}))} style={i} /></div>
+              <div><label style={l}>Description</label><input value={newHT.description} onChange={e=>setNewHT(p=>({...p,description:e.target.value}))} style={i} /></div>
             </div>
             <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:22 }}>
-              <button onClick={() => setShowAddHT(false)} style={btnG}>Cancel</button>
-              <button onClick={addHierarchyType} style={btnP}>Add Type</button>
+              <button onClick={()=>setShowAddHT(false)} style={bG}>Cancel</button>
+              <button onClick={()=>{if(!newHT.id.trim()||!newHT.label.trim())return;setHierarchyTypes(p=>[...p,{...newHT}]);setNewHT({id:"",label:"",description:""});setShowAddHT(false);}} style={bP}>Add</button>
             </div>
           </div>
         </div>
@@ -533,24 +392,17 @@ function HierarchiesPage({ companies, setCompanies, relationships, setRelationsh
   );
 }
 
-// ─── Enterprise Setup page ────────────────────────────────────────────────────
 function EnterpriseSetupPage({ companies, setCompanies, relationships, setRelationships, hierarchyTypes, setHierarchyTypes }) {
   const [subNav, setSubNav] = useState("hierarchies");
   return (
     <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
       <div style={{ width:180, background:"#f8f9fa", borderRight:"1px solid #dee2e6", padding:"12px 0" }}>
         <div style={{ fontSize:10, fontWeight:700, color:"#6c757d", textTransform:"uppercase", letterSpacing:0.5, padding:"0 14px 8px" }}>Enterprise Set Up</div>
-        <div onClick={() => setSubNav("hierarchies")}
-          style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 14px", cursor:"pointer", fontSize:12, fontWeight:600,
-            background:   subNav === "hierarchies" ? TEAL_LIGHT : "transparent",
-            color:        subNav === "hierarchies" ? TEAL_DARK  : "#495057",
-            borderLeft:   subNav === "hierarchies" ? `3px solid ${TEAL}` : "3px solid transparent" }}>
+        <div onClick={()=>setSubNav("hierarchies")} style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 14px", cursor:"pointer", fontSize:12, fontWeight:600, background:subNav==="hierarchies"?TEAL_LIGHT:"transparent", color:subNav==="hierarchies"?TEAL_DARK:"#495057", borderLeft:subNav==="hierarchies"?`3px solid ${TEAL}`:"3px solid transparent" }}>
           <span>🏗</span> Hierarchies
         </div>
       </div>
-      {subNav === "hierarchies" && (
-        <HierarchiesPage companies={companies} setCompanies={setCompanies} relationships={relationships} setRelationships={setRelationships} hierarchyTypes={hierarchyTypes} setHierarchyTypes={setHierarchyTypes} />
-      )}
+      {subNav==="hierarchies" && <HierarchiesPage companies={companies} setCompanies={setCompanies} relationships={relationships} setRelationships={setRelationships} hierarchyTypes={hierarchyTypes} setHierarchyTypes={setHierarchyTypes} />}
     </div>
   );
 }
@@ -558,34 +410,67 @@ function EnterpriseSetupPage({ companies, setCompanies, relationships, setRelati
 function PlaceholderPage({ title }) {
   return (
     <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", color:"#6c757d" }}>
-      <div style={{ textAlign:"center" }}>
-        <div style={{ fontSize:48, marginBottom:12 }}>🚧</div>
-        <div style={{ fontSize:18, fontWeight:700, marginBottom:6 }}>{title}</div>
-        <div style={{ fontSize:13 }}>This module is under construction.</div>
-      </div>
+      <div style={{ textAlign:"center" }}><div style={{ fontSize:48, marginBottom:12 }}>🚧</div><div style={{ fontSize:18, fontWeight:700, marginBottom:6 }}>{title}</div><div style={{ fontSize:13 }}>This module is under construction.</div></div>
     </div>
   );
 }
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [cells, setCells]           = useState(() => makeCells());
-  const [tasks, setTasks]           = useState(TASKS);
-  const [period, setPeriod]         = useState("January 2026");
-  const [selected, setSelected]     = useState(null);
+  // ── Auth state ─────────────────────────────────────────────────────────────
+  const [users, setUsers]             = useState(null);   // null = loading
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoaded, setAuthLoaded]   = useState(false);
+
+  useEffect(() => {
+    loadUsers().then(u => {
+      setUsers(u);
+      const resolved = resolveSession(u);
+      setCurrentUser(resolved);
+      setAuthLoaded(true);
+    });
+  }, []);
+
+  async function handleUsersChange(updated) {
+    setUsers(updated);
+    await saveUsers(updated);
+    // If current user's own record changed, refresh it
+    if (currentUser) {
+      const refreshed = updated.find(u => u.id === currentUser.id);
+      if (refreshed) setCurrentUser(refreshed);
+    }
+  }
+
+  function handleLogin(user) {
+    // Update lastLogin
+    const updated = users.map(u => u.id === user.id ? { ...u, lastLogin: new Date().toISOString() } : u);
+    handleUsersChange(updated);
+    setCurrentUser(user);
+  }
+
+  function handleLogout() {
+    logout();
+    setCurrentUser(null);
+    setActiveNav("projects");
+  }
+
+  // ── Workflow state ─────────────────────────────────────────────────────────
+  const [cells, setCells]             = useState(() => makeCells());
+  const [tasks, setTasks]             = useState(TASKS);
+  const [period, setPeriod]           = useState("January 2026");
+  const [selected, setSelected]       = useState(null);
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterEntity, setFilterEntity] = useState("all");
-  const [noteInput, setNoteInput]   = useState("");
-  const [panel, setPanel]           = useState("detail");
+  const [noteInput, setNoteInput]     = useState("");
+  const [panel, setPanel]             = useState("detail");
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTaskName, setNewTaskName] = useState("");
   const [editingTask, setEditingTask] = useState(null);
   const [editTaskName, setEditTaskName] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeNav, setActiveNav]     = useState("projects");
 
-  // ── Project Tracking is now the default ──────────────────────────────────
-  const [activeNav, setActiveNav] = useState("projects");
-
+  // ── Hierarchy state ────────────────────────────────────────────────────────
   const [companies, setCompanies]           = useState(ALL_COMPANIES);
   const [relationships, setRelationships]   = useState(SEED_RELATIONSHIPS);
   const [hierarchyTypes, setHierarchyTypes] = useState(HIERARCHY_TYPES);
@@ -607,85 +492,90 @@ export default function App() {
     saveHierarchyData({ companies, relationships, hierarchyTypes });
   }, [companies, relationships, hierarchyTypes, storageLoaded]);
 
+  // ── Profile dropdown ───────────────────────────────────────────────────────
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  // ── Loading / auth gate ────────────────────────────────────────────────────
+  if (!authLoaded || !users) {
+    return (
+      <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#f4f6f9", fontFamily:"'Segoe UI', Arial, sans-serif" }}>
+        <div style={{ textAlign:"center", color:"#6c757d" }}>
+          <div style={{ fontSize:32, marginBottom:12 }}>⏳</div>
+          <div>Loading…</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <LoginPage users={users} onLogin={handleLogin} />;
+  }
+
+  // ── Derived permissions ────────────────────────────────────────────────────
+  const isAdmin      = currentUser.role === "administrator";
+  const canSeeTest   = currentUser.testFeatures;   // Period-End Close, Reports, Adjustments, Setup
+
+  // ── Nav items ──────────────────────────────────────────────────────────────
+  const navItems = [
+    { id:"projects",    label:"Project Tracking",      icon:"📊", always:true  },
+    { id:"admin",       label:"Admin",                 icon:"🔒", adminOnly:true },
+    { id:"workflow",    label:"Period-End Close",      icon:"▦",  testOnly:true },
+    { id:"reports",     label:"Reports",               icon:"≡",  testOnly:true },
+    { id:"adjustments", label:"Accounting Adjustments",icon:"≡",  testOnly:true },
+    { id:"setup",       label:"Enterprise Set Up",     icon:"⚙",  testOnly:true },
+  ].filter(n => {
+    if (n.adminOnly) return isAdmin;
+    if (n.testOnly)  return canSeeTest;
+    return true;
+  });
+
+  // If current nav is no longer visible (e.g. permissions changed), reset
+  const validNav = navItems.some(n => n.id === activeNav);
+  const effectiveNav = validNav ? activeNav : "projects";
+
+  const pageTitle = {
+    projects:"Project Tracking", admin:"Admin — User Management",
+    workflow:"Period-End Close Workflow", reports:"Reports",
+    adjustments:"Accounting Adjustments", setup:"Enterprise Set Up",
+  }[effectiveNav];
+
+  // ── Workflow helpers ───────────────────────────────────────────────────────
   const key  = selected ? `${selected.entity}::${selected.taskId}` : null;
   const cell = key ? cells[key] : null;
 
-  const filteredEntities = useMemo(() => {
-    if (filterEntity !== "all") return ENTITIES.filter(e => e === filterEntity);
-    return ENTITIES;
-  }, [filterEntity]);
-
-  const visibleEntities = useMemo(() => {
-    if (filterStatus === "all") return filteredEntities;
-    return filteredEntities.filter(e =>
-      tasks.some(t => { const c = cells[`${e}::${t.id}`]; return c && c.status === filterStatus; })
-    );
+  const filteredEntities = useMemo(() => filterEntity!=="all" ? ENTITIES.filter(e=>e===filterEntity) : ENTITIES, [filterEntity]);
+  const visibleEntities  = useMemo(() => {
+    if (filterStatus==="all") return filteredEntities;
+    return filteredEntities.filter(e => tasks.some(t => { const c=cells[`${e}::${t.id}`]; return c&&c.status===filterStatus; }));
   }, [filterStatus, filteredEntities, cells, tasks]);
 
-  function entityCount(entity) {
-    const done = tasks.filter(t => cells[`${entity}::${t.id}`]?.status === "complete").length;
-    return { done, total: tasks.length };
-  }
-  function taskColCount(taskId) {
-    const done = ENTITIES.filter(e => cells[`${e}::${taskId}`]?.status === "complete").length;
-    return { done, total: ENTITIES.length };
-  }
-  function markComplete() {
-    if (!key || !cell) return;
-    setCells(prev => ({ ...prev, [key]: { ...prev[key], status:"complete", completedDate:fmt(today) } }));
-  }
-  function reverseComplete() {
-    if (!key || !cell) return;
-    setCells(prev => ({ ...prev, [key]: { ...prev[key], status:"overdue", completedDate:null } }));
-  }
+  function entityCount(entity) { const done=tasks.filter(t=>cells[`${entity}::${t.id}`]?.status==="complete").length; return {done,total:tasks.length}; }
+  function taskColCount(taskId) { const done=ENTITIES.filter(e=>cells[`${e}::${taskId}`]?.status==="complete").length; return {done,total:ENTITIES.length}; }
+  function markComplete()    { if(!key||!cell)return; setCells(p=>({...p,[key]:{...p[key],status:"complete",completedDate:fmt(today)}})); }
+  function reverseComplete() { if(!key||!cell)return; setCells(p=>({...p,[key]:{...p[key],status:"overdue",completedDate:null}})); }
   function addNote() {
-    if (!noteInput.trim() || !key) return;
-    const note = { user:"Mark Richardson", time:`${fmt(today)} ${today.getHours()}:${String(today.getMinutes()).padStart(2,"0")}`, text:noteInput.trim() };
-    setCells(prev => ({ ...prev, [key]: { ...prev[key], notes:[...prev[key].notes, note] } }));
+    if(!noteInput.trim()||!key)return;
+    const note={user:fullName(currentUser),time:`${fmt(today)} ${today.getHours()}:${String(today.getMinutes()).padStart(2,"0")}`,text:noteInput.trim()};
+    setCells(p=>({...p,[key]:{...p[key],notes:[...p[key].notes,note]}}));
     setNoteInput("");
   }
   function addTask() {
-    if (!newTaskName.trim()) return;
-    const id = Math.max(...tasks.map(t => t.id)) + 1;
-    const t  = { id, name:newTaskName.trim(), short:newTaskName.trim().slice(0,10) };
-    setTasks(prev => [...prev, t]);
-    const newCells = {};
-    ENTITIES.forEach(e => { newCells[`${e}::${id}`] = { status:"unassigned", dueDate:fmt(daysFromToday(7)), completedDate:null, user:null, notes:[], attachments:[] }; });
-    setCells(prev => ({ ...prev, ...newCells }));
+    if(!newTaskName.trim())return;
+    const id=Math.max(...tasks.map(t=>t.id))+1;
+    setTasks(p=>[...p,{id,name:newTaskName.trim(),short:newTaskName.trim().slice(0,10)}]);
+    const nc={};
+    ENTITIES.forEach(e=>{nc[`${e}::${id}`]={status:"unassigned",dueDate:fmt(daysFromToday(7)),completedDate:null,user:null,notes:[],attachments:[]};});
+    setCells(p=>({...p,...nc}));
     setNewTaskName(""); setShowAddTask(false);
   }
-  function deleteTask(taskId) {
-    setTasks(prev => prev.filter(t => t.id !== taskId));
-    if (selected?.taskId === taskId) setSelected(null);
-  }
-  function saveTaskName() {
-    if (!editTaskName.trim()) return;
-    setTasks(prev => prev.map(t => t.id === editingTask ? { ...t, name:editTaskName, short:editTaskName.slice(0,10) } : t));
-    setEditingTask(null); setEditTaskName("");
-  }
-
-  // ── Nav items — Project Tracking first ───────────────────────────────────
-  const navItems = [
-    { id: "projects",    label: "Project Tracking",       icon: "📊" },
-    { id: "workflow",    label: "Period-End Close",        icon: "▦"  },
-    { id: "reports",     label: "Reports",                 icon: "≡"  },
-    { id: "adjustments", label: "Accounting Adjustments",  icon: "≡"  },
-    { id: "setup",       label: "Enterprise Set Up",        icon: "⚙"  },
-  ];
-
-  const pageTitle = {
-    projects:    "Project Tracking",
-    workflow:    "Period-End Close Workflow",
-    reports:     "Reports",
-    adjustments: "Accounting Adjustments",
-    setup:       "Enterprise Set Up",
-  }[activeNav];
+  function deleteTask(taskId) { setTasks(p=>p.filter(t=>t.id!==taskId)); if(selected?.taskId===taskId) setSelected(null); }
+  function saveTaskName() { if(!editTaskName.trim())return; setTasks(p=>p.map(t=>t.id===editingTask?{...t,name:editTaskName,short:editTaskName.slice(0,10)}:t)); setEditingTask(null); setEditTaskName(""); }
 
   return (
     <div style={{ display:"flex", height:"100vh", fontFamily:"'Segoe UI', Arial, sans-serif", fontSize:13, background:"#f0f2f4" }}>
 
-      {/* ── Sidebar ────────────────────────────────────────────────────────── */}
-      <div style={{ width: sidebarOpen ? 220 : 48, background:"teal", color:"#fff", display:"flex", flexDirection:"column", transition:"width 0.2s", flexShrink:0, overflow:"hidden" }}>
+      {/* ── Sidebar ── */}
+      <div style={{ width:sidebarOpen?220:48, background:"teal", color:"#fff", display:"flex", flexDirection:"column", transition:"width 0.2s", flexShrink:0, overflow:"hidden" }}>
         <div style={{ padding:"16px 12px", display:"flex", alignItems:"center", gap:10, borderBottom:"1px solid rgba(255,255,255,0.15)" }}>
           <div style={{ width:32, height:32, background:"#fff", borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
             <span style={{ color:TEAL, fontWeight:900, fontSize:15 }}>M</span>
@@ -693,121 +583,126 @@ export default function App() {
           {sidebarOpen && <span style={{ fontWeight:700, fontSize:16, letterSpacing:0.5 }}>Mondial</span>}
         </div>
         <div style={{ padding:"8px 0", flex:1 }}>
-          {navItems.map(n => (
-            <div key={n.id} onClick={() => setActiveNav(n.id)}
+          {navItems.map(n=>(
+            <div key={n.id} onClick={()=>setActiveNav(n.id)}
               style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px", cursor:"pointer",
-                background:   activeNav === n.id ? "rgba(255,255,255,0.15)" : "transparent",
-                borderLeft:   activeNav === n.id ? "3px solid #fff" : "3px solid transparent" }}>
+                background:effectiveNav===n.id?"rgba(255,255,255,0.15)":"transparent",
+                borderLeft:effectiveNav===n.id?"3px solid #fff":"3px solid transparent" }}>
               <span style={{ fontSize:16, width:20, textAlign:"center", flexShrink:0 }}>{n.icon}</span>
               {sidebarOpen && <span style={{ fontSize:13, whiteSpace:"nowrap" }}>{n.label}</span>}
             </div>
           ))}
         </div>
         <div style={{ padding:"12px 14px", borderTop:"1px solid rgba(255,255,255,0.15)", display:"flex", alignItems:"center", gap:8 }}>
-          <span style={{ fontSize:16, cursor:"pointer", flexShrink:0 }} onClick={() => setSidebarOpen(p => !p)}>{sidebarOpen ? "◀" : "▶"}</span>
+          <span style={{ fontSize:16, cursor:"pointer", flexShrink:0 }} onClick={()=>setSidebarOpen(p=>!p)}>{sidebarOpen?"◀":"▶"}</span>
           {sidebarOpen && <span style={{ fontSize:11, opacity:0.7 }}>Collapse</span>}
         </div>
       </div>
 
-      {/* ── Main area ──────────────────────────────────────────────────────── */}
+      {/* ── Main area ── */}
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
 
         {/* Top bar */}
         <div style={{ background:"#fff", borderBottom:"1px solid #dee2e6", padding:"0 20px", height:48, display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
           <div style={{ display:"flex", alignItems:"center", gap:16 }}>
             <span style={{ fontWeight:700, fontSize:15, color:"#2c3e50" }}>{pageTitle}</span>
-            {activeNav === "workflow" && (
-              <select value={period} onChange={e => setPeriod(e.target.value)}
-                style={{ border:"1px solid #ced4da", borderRadius:4, padding:"4px 8px", fontSize:13, color:"#495057" }}>
-                {["January 2026","December 2025","November 2025"].map(p => <option key={p}>{p}</option>)}
+            {effectiveNav==="workflow" && (
+              <select value={period} onChange={e=>setPeriod(e.target.value)} style={{ border:"1px solid #ced4da", borderRadius:4, padding:"4px 8px", fontSize:13, color:"#495057" }}>
+                {["January 2026","December 2025","November 2025"].map(p=><option key={p}>{p}</option>)}
               </select>
             )}
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-            <span style={{ fontSize:12, color:"#6c757d" }}>mark.richardson@mondialsoftware.com</span>
-            <div style={{ width:30, height:30, borderRadius:"50%", background:TEAL, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700 }}>MR</div>
+
+          {/* Profile area */}
+          <div style={{ position:"relative" }}>
+            <div onClick={()=>setShowProfileMenu(p=>!p)}
+              style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", padding:"4px 8px", borderRadius:8, background:showProfileMenu?"#f0f2f4":"transparent" }}>
+              <span style={{ fontSize:12, color:"#6c757d" }}>{currentUser.email}</span>
+              <div style={{ width:32, height:32, borderRadius:"50%", background:TEAL, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, flexShrink:0 }}>
+                {initials(currentUser)}
+              </div>
+            </div>
+
+            {/* Dropdown */}
+            {showProfileMenu && (
+              <div style={{ position:"absolute", right:0, top:44, background:"#fff", borderRadius:10, border:"1px solid #e9ecef", boxShadow:"0 8px 24px rgba(0,0,0,0.12)", minWidth:220, zIndex:500 }}
+                onMouseLeave={()=>setShowProfileMenu(false)}>
+                <div style={{ padding:"14px 16px", borderBottom:"1px solid #e9ecef" }}>
+                  <div style={{ fontWeight:700, fontSize:13, color:"#2c3e50" }}>{fullName(currentUser)}</div>
+                  <div style={{ fontSize:11, color:"#6c757d", marginTop:2 }}>{currentUser.email}</div>
+                  <div style={{ marginTop:6 }}>
+                    <span style={{ fontSize:10, padding:"2px 8px", borderRadius:10, fontWeight:700,
+                      background:isAdmin?"#d4edda":"#cce5ff",
+                      color:isAdmin?"#155724":"#004085",
+                      border:`1px solid ${isAdmin?"#28a745":"#0066cc"}` }}>
+                      {isAdmin?"Administrator":"User"}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ padding:"6px 0" }}>
+                  <div onClick={handleLogout}
+                    style={{ padding:"10px 16px", fontSize:13, color:"#dc3545", cursor:"pointer", fontWeight:600, display:"flex", alignItems:"center", gap:8 }}
+                    onMouseEnter={e=>e.currentTarget.style.background="#fff5f5"}
+                    onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                    🚪 Sign out
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Page content */}
         <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
-          {activeNav === "projects"    && <ProjectTracking />}
-          {activeNav === "reports"     && <PlaceholderPage title="Reports" />}
-          {activeNav === "adjustments" && <PlaceholderPage title="Accounting Adjustments" />}
-          {activeNav === "setup"       && (
-            <EnterpriseSetupPage
-              companies={companies}         setCompanies={setCompanies}
-              relationships={relationships} setRelationships={setRelationships}
-              hierarchyTypes={hierarchyTypes} setHierarchyTypes={setHierarchyTypes}
-            />
-          )}
+          {effectiveNav==="projects"    && <ProjectTracking />}
+          {effectiveNav==="admin"       && isAdmin && <AdminPage users={users} currentUser={currentUser} onUsersChange={handleUsersChange} />}
+          {effectiveNav==="reports"     && <PlaceholderPage title="Reports" />}
+          {effectiveNav==="adjustments" && <PlaceholderPage title="Accounting Adjustments" />}
+          {effectiveNav==="setup"       && <EnterpriseSetupPage companies={companies} setCompanies={setCompanies} relationships={relationships} setRelationships={setRelationships} hierarchyTypes={hierarchyTypes} setHierarchyTypes={setHierarchyTypes} />}
 
-          {/* ── Period-End Close workflow ─────────────────────────────────── */}
-          {activeNav === "workflow" && (
+          {effectiveNav==="workflow" && (
             <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", padding:16, gap:12 }}>
-              {/* Filter bar */}
               <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
                 <div style={{ display:"flex", alignItems:"center", gap:6 }}>
                   <span style={{ fontSize:12, color:"#6c757d" }}>Filter:</span>
-                  <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ border:"1px solid #ced4da", borderRadius:4, padding:"4px 8px", fontSize:12 }}>
-                    <option value="all">All statuses</option>
-                    <option value="overdue">Overdue</option>
-                    <option value="due-soon">Due soon</option>
-                    <option value="complete">Complete</option>
-                    <option value="on-track">On track</option>
-                    <option value="unassigned">Unassigned</option>
-                    <option value="not-required">Not required</option>
+                  <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{ border:"1px solid #ced4da", borderRadius:4, padding:"4px 8px", fontSize:12 }}>
+                    <option value="all">All statuses</option><option value="overdue">Overdue</option><option value="due-soon">Due soon</option><option value="complete">Complete</option><option value="on-track">On track</option><option value="unassigned">Unassigned</option><option value="not-required">Not required</option>
                   </select>
-                  <select value={filterEntity} onChange={e => setFilterEntity(e.target.value)} style={{ border:"1px solid #ced4da", borderRadius:4, padding:"4px 8px", fontSize:12 }}>
-                    <option value="all">All entities</option>
-                    {ENTITIES.map(e => <option key={e}>{e}</option>)}
+                  <select value={filterEntity} onChange={e=>setFilterEntity(e.target.value)} style={{ border:"1px solid #ced4da", borderRadius:4, padding:"4px 8px", fontSize:12 }}>
+                    <option value="all">All entities</option>{ENTITIES.map(e=><option key={e}>{e}</option>)}
                   </select>
                 </div>
                 <div style={{ marginLeft:"auto", display:"flex", gap:8 }}>
-                  {showAddTask ? (
-                    <div style={{ display:"flex", gap:6, alignItems:"center" }}>
-                      <input value={newTaskName} onChange={e => setNewTaskName(e.target.value)} placeholder="New task name…" autoFocus
-                        onKeyDown={e => e.key === "Enter" && addTask()}
-                        style={{ border:"1px solid #ced4da", borderRadius:4, padding:"4px 8px", fontSize:12, width:200 }} />
-                      <button onClick={addTask}                style={{ background:TEAL,      color:"#fff", border:"none", borderRadius:4, padding:"4px 10px", fontSize:12, cursor:"pointer" }}>Add</button>
-                      <button onClick={() => setShowAddTask(false)} style={{ background:"#6c757d", color:"#fff", border:"none", borderRadius:4, padding:"4px 10px", fontSize:12, cursor:"pointer" }}>Cancel</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => setShowAddTask(true)} style={{ background:TEAL, color:"#fff", border:"none", borderRadius:4, padding:"6px 14px", fontSize:12, cursor:"pointer", fontWeight:600 }}>+ Add Task</button>
-                  )}
+                  {showAddTask
+                    ? <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                        <input value={newTaskName} onChange={e=>setNewTaskName(e.target.value)} placeholder="New task name…" autoFocus onKeyDown={e=>e.key==="Enter"&&addTask()} style={{ border:"1px solid #ced4da", borderRadius:4, padding:"4px 8px", fontSize:12, width:200 }} />
+                        <button onClick={addTask} style={{ background:TEAL, color:"#fff", border:"none", borderRadius:4, padding:"4px 10px", fontSize:12, cursor:"pointer" }}>Add</button>
+                        <button onClick={()=>setShowAddTask(false)} style={{ background:"#6c757d", color:"#fff", border:"none", borderRadius:4, padding:"4px 10px", fontSize:12, cursor:"pointer" }}>Cancel</button>
+                      </div>
+                    : <button onClick={()=>setShowAddTask(true)} style={{ background:TEAL, color:"#fff", border:"none", borderRadius:4, padding:"6px 14px", fontSize:12, cursor:"pointer", fontWeight:600 }}>+ Add Task</button>}
                 </div>
               </div>
-
-              {/* Legend */}
               <div style={{ display:"flex", gap:12, alignItems:"center", fontSize:11 }}>
-                {[["complete","#d4edda","#28a745","Complete"],["overdue","#f8d7da","#dc3545","Overdue"],["due-soon","#fff3cd","#ffc107","Due Soon"],["on-track","#f8f9fa","#dee2e6","On Track"],["unassigned","#e9ecef","#ced4da","Unassigned"],["not-required","#e8e8f0","#9999bb","Not Required"]].map(([,bg,border,label]) => (
+                {[["complete","#d4edda","#28a745","Complete"],["overdue","#f8d7da","#dc3545","Overdue"],["due-soon","#fff3cd","#ffc107","Due Soon"],["on-track","#f8f9fa","#dee2e6","On Track"],["unassigned","#e9ecef","#ced4da","Unassigned"],["not-required","#e8e8f0","#9999bb","Not Required"]].map(([,bg,border,label])=>(
                   <div key={label} style={{ display:"flex", alignItems:"center", gap:4 }}>
                     <div style={{ width:14, height:14, background:bg, border:`2px solid ${border}`, borderRadius:3 }} />
                     <span style={{ color:"#6c757d" }}>{label}</span>
                   </div>
                 ))}
               </div>
-
-              {/* Grid */}
               <div style={{ flex:1, overflow:"auto", background:"#fff", borderRadius:8, border:"1px solid #dee2e6", boxShadow:"0 1px 3px rgba(0,0,0,0.06)" }}>
                 <table style={{ borderCollapse:"collapse", width:"100%", tableLayout:"fixed" }}>
-                  <colgroup>
-                    <col style={{ width:170 }} />
-                    {tasks.map(t => <col key={t.id} style={{ width:90 }} />)}
-                    <col style={{ width:70 }} />
-                  </colgroup>
+                  <colgroup><col style={{ width:170 }}/>{tasks.map(t=><col key={t.id} style={{ width:90 }}/>)}<col style={{ width:70 }}/></colgroup>
                   <thead>
                     <tr style={{ background:TEAL, color:"#fff" }}>
                       <th style={{ padding:"10px 12px", textAlign:"left", fontWeight:600, fontSize:12, position:"sticky", top:0, left:0, zIndex:10, background:TEAL, borderRight:"1px solid rgba(255,255,255,0.2)" }}>Entity</th>
-                      {tasks.map(t => (
+                      {tasks.map(t=>(
                         <th key={t.id} style={{ padding:"8px 4px", textAlign:"center", fontWeight:600, fontSize:11, position:"sticky", top:0, zIndex:9, background:TEAL, borderRight:"1px solid rgba(255,255,255,0.15)" }}>
                           <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:3 }}>
-                            {editingTask === t.id
-                              ? <input value={editTaskName} onChange={e => setEditTaskName(e.target.value)} onKeyDown={e => e.key === "Enter" && saveTaskName()} autoFocus style={{ fontSize:10, width:70, textAlign:"center", borderRadius:3, border:"none", padding:"2px 4px" }} />
-                              : <span style={{ lineHeight:1.2 }}>{t.short}</span>}
+                            {editingTask===t.id?<input value={editTaskName} onChange={e=>setEditTaskName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&saveTaskName()} autoFocus style={{ fontSize:10, width:70, textAlign:"center", borderRadius:3, border:"none", padding:"2px 4px" }}/>:<span style={{ lineHeight:1.2 }}>{t.short}</span>}
                             <div style={{ display:"flex", gap:3 }}>
-                              <span onClick={() => { setEditingTask(t.id); setEditTaskName(t.name); }} style={{ cursor:"pointer", opacity:0.7, fontSize:10 }} title="Rename">✎</span>
-                              <span onClick={() => deleteTask(t.id)} style={{ cursor:"pointer", opacity:0.7, fontSize:10 }} title="Delete">✕</span>
+                              <span onClick={()=>{setEditingTask(t.id);setEditTaskName(t.name);}} style={{ cursor:"pointer", opacity:0.7, fontSize:10 }} title="Rename">✎</span>
+                              <span onClick={()=>deleteTask(t.id)} style={{ cursor:"pointer", opacity:0.7, fontSize:10 }} title="Delete">✕</span>
                             </div>
                           </div>
                         </th>
@@ -816,26 +711,20 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleEntities.map((entity, ei) => {
-                      const { done, total } = entityCount(entity);
-                      const pct = Math.round((done / total) * 100);
+                    {visibleEntities.map((entity,ei)=>{
+                      const {done,total}=entityCount(entity); const pct=Math.round((done/total)*100);
                       return (
-                        <tr key={entity} style={{ background: ei%2===0 ? "#fff" : "#f8f9fa", borderBottom:"1px solid #dee2e6" }}>
-                          <td style={{ padding:"8px 12px", fontWeight:600, fontSize:12, color:"#2c3e50", position:"sticky", left:0, background: ei%2===0 ? "#fff" : "#f8f9fa", borderRight:"1px solid #dee2e6", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }} title={entity}>{entity}</td>
-                          {tasks.map(t => {
-                            const c = cells[`${entity}::${t.id}`];
-                            if (!c) return <td key={t.id} />;
-                            const s = STATUS_STYLES[c.status];
-                            const isSel = selected?.entity === entity && selected?.taskId === t.id;
+                        <tr key={entity} style={{ background:ei%2===0?"#fff":"#f8f9fa", borderBottom:"1px solid #dee2e6" }}>
+                          <td style={{ padding:"8px 12px", fontWeight:600, fontSize:12, color:"#2c3e50", position:"sticky", left:0, background:ei%2===0?"#fff":"#f8f9fa", borderRight:"1px solid #dee2e6", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }} title={entity}>{entity}</td>
+                          {tasks.map(t=>{
+                            const c=cells[`${entity}::${t.id}`]; if(!c)return<td key={t.id}/>;
+                            const s=STATUS_STYLES[c.status]; const isSel=selected?.entity===entity&&selected?.taskId===t.id;
                             return (
-                              <td key={t.id} onClick={() => { setSelected({ entity, taskId:t.id }); setPanel("detail"); }}
-                                style={{ padding:"4px 3px", textAlign:"center", cursor:"pointer", borderRight:"1px solid #e9ecef" }}>
-                                <div style={{ background:s.bg, border:`2px solid ${isSel ? "#0056b3" : s.border}`, borderRadius:5, padding:"5px 3px", fontSize:10, lineHeight:1.3, outline: isSel ? "2px solid #0056b3" : "none", boxShadow: isSel ? "0 0 0 2px #0056b3" : "none" }}>
-                                  <div style={{ color:s.color, fontWeight:600, fontSize:9, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                                    {c.user ? c.user.split(" ").map(n => n[0]).join("") : "—"}
-                                  </div>
-                                  <div style={{ color:s.color, fontSize:9 }}>{c.status === "complete" ? c.completedDate : c.status === "not-required" ? "N/A" : c.dueDate}</div>
-                                  {c.notes.length > 0 && <div style={{ fontSize:9 }}>📎</div>}
+                              <td key={t.id} onClick={()=>{setSelected({entity,taskId:t.id});setPanel("detail");}} style={{ padding:"4px 3px", textAlign:"center", cursor:"pointer", borderRight:"1px solid #e9ecef" }}>
+                                <div style={{ background:s.bg, border:`2px solid ${isSel?"#0056b3":s.border}`, borderRadius:5, padding:"5px 3px", fontSize:10, lineHeight:1.3, boxShadow:isSel?"0 0 0 2px #0056b3":"none" }}>
+                                  <div style={{ color:s.color, fontWeight:600, fontSize:9, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.user?c.user.split(" ").map(n=>n[0]).join(""):"—"}</div>
+                                  <div style={{ color:s.color, fontSize:9 }}>{c.status==="complete"?c.completedDate:c.status==="not-required"?"N/A":c.dueDate}</div>
+                                  {c.notes.length>0&&<div style={{ fontSize:9 }}>📎</div>}
                                 </div>
                               </td>
                             );
@@ -843,7 +732,7 @@ export default function App() {
                           <td style={{ padding:"6px 8px", textAlign:"center" }}>
                             <div style={{ fontSize:10, color:"#495057", fontWeight:600, marginBottom:3 }}>{done}/{total}</div>
                             <div style={{ background:"#e9ecef", borderRadius:3, height:6, overflow:"hidden" }}>
-                              <div style={{ width:`${pct}%`, height:"100%", background: pct===100 ? "#28a745" : pct>50 ? TEAL : "#ffc107" }} />
+                              <div style={{ width:`${pct}%`, height:"100%", background:pct===100?"#28a745":pct>50?TEAL:"#ffc107" }} />
                             </div>
                           </td>
                         </tr>
@@ -851,15 +740,8 @@ export default function App() {
                     })}
                     <tr style={{ background:TEAL_LIGHT, borderTop:"2px solid #ced4da", position:"sticky", bottom:0 }}>
                       <td style={{ padding:"8px 12px", fontWeight:700, fontSize:12, color:TEAL_DARK, position:"sticky", left:0, background:TEAL_LIGHT, borderRight:"1px solid #dee2e6" }}>Summary</td>
-                      {tasks.map(t => {
-                        const { done, total } = taskColCount(t.id);
-                        return (
-                          <td key={t.id} style={{ padding:"6px 3px", textAlign:"center", borderRight:"1px solid #e9ecef" }}>
-                            <div style={{ fontSize:11, fontWeight:700, color: done===total ? "#28a745" : TEAL_DARK }}>{done}/{total}</div>
-                          </td>
-                        );
-                      })}
-                      <td />
+                      {tasks.map(t=>{const{done,total}=taskColCount(t.id);return<td key={t.id} style={{ padding:"6px 3px", textAlign:"center", borderRight:"1px solid #e9ecef" }}><div style={{ fontSize:11, fontWeight:700, color:done===total?"#28a745":TEAL_DARK }}>{done}/{total}</div></td>;})}
+                      <td/>
                     </tr>
                   </tbody>
                 </table>
@@ -867,74 +749,49 @@ export default function App() {
             </div>
           )}
 
-          {/* ── Detail panel ─────────────────────────────────────────────── */}
-          {activeNav === "workflow" && selected && cell && (
+          {effectiveNav==="workflow" && selected && cell && (
             <div style={{ width:320, background:"#fff", borderLeft:"1px solid #dee2e6", display:"flex", flexDirection:"column", overflow:"hidden", flexShrink:0 }}>
               <div style={{ background:TEAL, color:"#fff", padding:"12px 16px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-                <div>
-                  <div style={{ fontWeight:700, fontSize:13 }}>{tasks.find(t => t.id === selected.taskId)?.name}</div>
-                  <div style={{ fontSize:11, opacity:0.85, marginTop:3 }}>{selected.entity}</div>
-                </div>
-                <span onClick={() => setSelected(null)} style={{ cursor:"pointer", fontSize:18, lineHeight:1, opacity:0.8 }}>✕</span>
+                <div><div style={{ fontWeight:700, fontSize:13 }}>{tasks.find(t=>t.id===selected.taskId)?.name}</div><div style={{ fontSize:11, opacity:0.85, marginTop:3 }}>{selected.entity}</div></div>
+                <span onClick={()=>setSelected(null)} style={{ cursor:"pointer", fontSize:18, lineHeight:1, opacity:0.8 }}>✕</span>
               </div>
               <div style={{ display:"flex", borderBottom:"1px solid #dee2e6" }}>
-                {["detail","notes"].map(p => (
-                  <div key={p} onClick={() => setPanel(p)}
-                    style={{ flex:1, padding:"10px", textAlign:"center", fontSize:12, fontWeight:600, cursor:"pointer",
-                      color:       panel === p ? TEAL : "#6c757d",
-                      borderBottom: panel === p ? `2px solid ${TEAL}` : "2px solid transparent",
-                      textTransform:"capitalize" }}>
-                    {p === "notes" ? `Notes (${cell.notes.length})` : "Detail"}
+                {["detail","notes"].map(p=>(
+                  <div key={p} onClick={()=>setPanel(p)} style={{ flex:1, padding:"10px", textAlign:"center", fontSize:12, fontWeight:600, cursor:"pointer", color:panel===p?TEAL:"#6c757d", borderBottom:panel===p?`2px solid ${TEAL}`:"2px solid transparent", textTransform:"capitalize" }}>
+                    {p==="notes"?`Notes (${cell.notes.length})`:"Detail"}
                   </div>
                 ))}
               </div>
               <div style={{ flex:1, overflow:"auto", padding:16 }}>
-                {panel === "detail" && (
+                {panel==="detail" && (
                   <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
                     <div>
                       <div style={{ fontSize:11, color:"#6c757d", marginBottom:4, fontWeight:600 }}>STATUS</div>
-                      <div style={{ display:"inline-block", padding:"4px 12px", borderRadius:20, fontSize:12, fontWeight:700,
-                        background: STATUS_STYLES[cell.status].bg,
-                        color:      STATUS_STYLES[cell.status].color,
-                        border:    `1px solid ${STATUS_STYLES[cell.status].border}` }}>
-                        {cell.status === "complete" ? "✓ Complete" : cell.status === "overdue" ? "⚠ Overdue" : cell.status === "due-soon" ? "⏰ Due Soon" : cell.status === "on-track" ? "→ On Track" : cell.status === "not-required" ? "⊘ Not Required" : "— Unassigned"}
+                      <div style={{ display:"inline-block", padding:"4px 12px", borderRadius:20, fontSize:12, fontWeight:700, background:STATUS_STYLES[cell.status].bg, color:STATUS_STYLES[cell.status].color, border:`1px solid ${STATUS_STYLES[cell.status].border}` }}>
+                        {cell.status==="complete"?"✓ Complete":cell.status==="overdue"?"⚠ Overdue":cell.status==="due-soon"?"⏰ Due Soon":cell.status==="on-track"?"→ On Track":cell.status==="not-required"?"⊘ Not Required":"— Unassigned"}
                       </div>
                     </div>
-                    {[["ASSIGNED TO", cell.user||"Not assigned"],["DUE DATE", cell.dueDate],...(cell.status==="complete"?[["COMPLETED",cell.completedDate]]:[])].map(([label,val])=>(
-                      <div key={label}>
-                        <div style={{ fontSize:11, color:"#6c757d", marginBottom:4, fontWeight:600 }}>{label}</div>
-                        <div style={{ fontSize:13, color:"#2c3e50", fontWeight:500 }}>{val}</div>
-                      </div>
+                    {[["ASSIGNED TO",cell.user||"Not assigned"],["DUE DATE",cell.dueDate],...(cell.status==="complete"?[["COMPLETED",cell.completedDate]]:[])].map(([label,val])=>(
+                      <div key={label}><div style={{ fontSize:11, color:"#6c757d", marginBottom:4, fontWeight:600 }}>{label}</div><div style={{ fontSize:13, color:"#2c3e50", fontWeight:500 }}>{val}</div></div>
                     ))}
-                    <div>
-                      <div style={{ fontSize:11, color:"#6c757d", marginBottom:4, fontWeight:600 }}>PERIOD</div>
-                      <div style={{ fontSize:13, color:"#2c3e50", fontWeight:500 }}>{period}</div>
-                    </div>
+                    <div><div style={{ fontSize:11, color:"#6c757d", marginBottom:4, fontWeight:600 }}>PERIOD</div><div style={{ fontSize:13, color:"#2c3e50", fontWeight:500 }}>{period}</div></div>
                     <div style={{ borderTop:"1px solid #dee2e6", paddingTop:14, display:"flex", flexDirection:"column", gap:8 }}>
                       <div style={{ fontSize:11, color:"#6c757d", fontWeight:600, marginBottom:2 }}>ACTIONS</div>
-                      {cell.status !== "complete" && cell.status !== "not-required" && (
-                        <button onClick={markComplete} style={{ background:"#28a745", color:"#fff", border:"none", borderRadius:5, padding:"9px 14px", fontSize:12, cursor:"pointer", fontWeight:600, textAlign:"left" }}>✓ Mark as Complete</button>
-                      )}
-                      {cell.status === "complete" && (
-                        <button onClick={reverseComplete} style={{ background:"#6c757d", color:"#fff", border:"none", borderRadius:5, padding:"9px 14px", fontSize:12, cursor:"pointer", fontWeight:600, textAlign:"left" }}>↩ Reverse Completion</button>
-                      )}
-                      {cell.status !== "not-required" ? (
-                        <button onClick={() => setCells(prev => ({ ...prev, [key]:{ ...prev[key], status:"not-required", user:null, completedDate:null } }))}
-                          style={{ background:"#e8e8f0", color:"#5a5a7a", border:"1px solid #9999bb", borderRadius:5, padding:"9px 14px", fontSize:12, cursor:"pointer", fontWeight:600, textAlign:"left" }}>⊘ Mark as Not Required</button>
-                      ) : (
-                        <button onClick={() => setCells(prev => ({ ...prev, [key]:{ ...prev[key], status:"on-track", user:null } }))}
-                          style={{ background:"#f8f9fa", color:"#495057", border:"1px solid #ced4da", borderRadius:5, padding:"9px 14px", fontSize:12, cursor:"pointer", fontWeight:600, textAlign:"left" }}>↩ Restore Task</button>
-                      )}
-                      <button onClick={() => setPanel("notes")} style={{ background:TEAL_LIGHT, color:TEAL_DARK, border:`1px solid ${TEAL}`, borderRadius:5, padding:"9px 14px", fontSize:12, cursor:"pointer", fontWeight:600, textAlign:"left" }}>📝 Add Note</button>
+                      {cell.status!=="complete"&&cell.status!=="not-required"&&<button onClick={markComplete} style={{ background:"#28a745", color:"#fff", border:"none", borderRadius:5, padding:"9px 14px", fontSize:12, cursor:"pointer", fontWeight:600, textAlign:"left" }}>✓ Mark as Complete</button>}
+                      {cell.status==="complete"&&<button onClick={reverseComplete} style={{ background:"#6c757d", color:"#fff", border:"none", borderRadius:5, padding:"9px 14px", fontSize:12, cursor:"pointer", fontWeight:600, textAlign:"left" }}>↩ Reverse Completion</button>}
+                      {cell.status!=="not-required"
+                        ?<button onClick={()=>setCells(p=>({...p,[key]:{...p[key],status:"not-required",user:null,completedDate:null}}))} style={{ background:"#e8e8f0", color:"#5a5a7a", border:"1px solid #9999bb", borderRadius:5, padding:"9px 14px", fontSize:12, cursor:"pointer", fontWeight:600, textAlign:"left" }}>⊘ Mark as Not Required</button>
+                        :<button onClick={()=>setCells(p=>({...p,[key]:{...p[key],status:"on-track",user:null}}))} style={{ background:"#f8f9fa", color:"#495057", border:"1px solid #ced4da", borderRadius:5, padding:"9px 14px", fontSize:12, cursor:"pointer", fontWeight:600, textAlign:"left" }}>↩ Restore Task</button>}
+                      <button onClick={()=>setPanel("notes")} style={{ background:TEAL_LIGHT, color:TEAL_DARK, border:`1px solid ${TEAL}`, borderRadius:5, padding:"9px 14px", fontSize:12, cursor:"pointer", fontWeight:600, textAlign:"left" }}>📝 Add Note</button>
                       <button style={{ background:"#f8f9fa", color:"#495057", border:"1px solid #ced4da", borderRadius:5, padding:"9px 14px", fontSize:12, cursor:"pointer", fontWeight:600, textAlign:"left" }}>📎 Attach Document</button>
                     </div>
                   </div>
                 )}
-                {panel === "notes" && (
+                {panel==="notes" && (
                   <div style={{ display:"flex", flexDirection:"column", gap:12, height:"100%" }}>
-                    {cell.notes.length === 0 && <div style={{ color:"#6c757d", fontSize:12, textAlign:"center", padding:"20px 0", fontStyle:"italic" }}>No notes yet. Add the first note below.</div>}
-                    {cell.notes.map((n, i) => (
-                      <div key={i} style={{ background:"#f8f9fa", borderRadius:6, padding:10, border:"1px solid #e9ecef" }}>
+                    {cell.notes.length===0&&<div style={{ color:"#6c757d", fontSize:12, textAlign:"center", padding:"20px 0", fontStyle:"italic" }}>No notes yet.</div>}
+                    {cell.notes.map((n,idx)=>(
+                      <div key={idx} style={{ background:"#f8f9fa", borderRadius:6, padding:10, border:"1px solid #e9ecef" }}>
                         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
                           <span style={{ fontWeight:700, fontSize:11, color:TEAL_DARK }}>{n.user}</span>
                           <span style={{ fontSize:10, color:"#6c757d" }}>{n.time}</span>
@@ -943,12 +800,8 @@ export default function App() {
                       </div>
                     ))}
                     <div style={{ marginTop:"auto", borderTop:"1px solid #dee2e6", paddingTop:12 }}>
-                      <textarea value={noteInput} onChange={e => setNoteInput(e.target.value)} placeholder="Type a note…"
-                        style={{ width:"100%", minHeight:80, border:"1px solid #ced4da", borderRadius:5, padding:8, fontSize:12, resize:"vertical", fontFamily:"inherit", boxSizing:"border-box" }} />
-                      <button onClick={addNote} disabled={!noteInput.trim()}
-                        style={{ marginTop:8, width:"100%", background: noteInput.trim() ? TEAL : "#ced4da", color:"#fff", border:"none", borderRadius:5, padding:"9px", fontSize:12, cursor: noteInput.trim() ? "pointer" : "default", fontWeight:600 }}>
-                        Post Note
-                      </button>
+                      <textarea value={noteInput} onChange={e=>setNoteInput(e.target.value)} placeholder="Type a note…" style={{ width:"100%", minHeight:80, border:"1px solid #ced4da", borderRadius:5, padding:8, fontSize:12, resize:"vertical", fontFamily:"inherit", boxSizing:"border-box" }} />
+                      <button onClick={addNote} disabled={!noteInput.trim()} style={{ marginTop:8, width:"100%", background:noteInput.trim()?TEAL:"#ced4da", color:"#fff", border:"none", borderRadius:5, padding:"9px", fontSize:12, cursor:noteInput.trim()?"pointer":"default", fontWeight:600 }}>Post Note</button>
                     </div>
                   </div>
                 )}
