@@ -92,13 +92,12 @@ function ProjectCard({ project, customer, oem, consultants, onClick }) {
 
 // ── List View Row ─────────────────────────────────────────────────────────────
 function ProjectRow({ project, customer, oem, consultants, onClick }) {
-  const totalUsed = project.categories.reduce((s,c)=>s+(c.usedHours||0),0);
+  const totalUsed    = project.categories.reduce((s,c)=>s+(c.usedHours||0),0);
   const plannedHours = project.categories.reduce((s,c)=>s+(c.plannedHours||0),0);
-  const denominator = plannedHours>0 ? plannedHours : (project.authorizedHours||project.poHours||0);
-  const pct = denominator>0?Math.round((totalUsed/denominator)*100):0;
-  const lead = consultants.find(u=>u.id===project.leadConsultantId);
-  const effStatus = getEffectiveStatus(project);
-  const daysLeft = Math.ceil((new Date(project.targetDate)-new Date())/86400000);
+  const authorized   = project.authorizedHours ?? project.poHours ?? 0;
+  const lead         = consultants.find(u=>u.id===project.leadConsultantId);
+  const effStatus    = getEffectiveStatus(project);
+  const pct          = authorized>0 ? Math.min(Math.round((totalUsed/authorized)*100),100) : 0;
 
   return (
     <tr onClick={onClick} style={{ cursor:"pointer",borderBottom:"1px solid #f0f2f4" }}
@@ -112,25 +111,27 @@ function ProjectRow({ project, customer, oem, consultants, onClick }) {
       <td style={{ padding:"12px 16px" }}><StatusPill status={effStatus} /></td>
       <td style={{ padding:"12px 16px",fontSize:12,color:"#6c757d" }}>{lead?.name||"—"}</td>
       <td style={{ padding:"12px 16px",fontSize:12 }}>
-        <div style={{ display:"flex",alignItems:"center",gap:8 }}>
-          <div style={{ flex:1,minWidth:80 }}><HoursBar used={totalUsed} po={denominator} /></div>
-          <span style={{ color:totalUsed>denominator?"#dc3545":"#6c757d",fontSize:11,whiteSpace:"nowrap" }}>{totalUsed}/{denominator}h</span>
+        <div style={{ marginBottom:5 }}>
+          <div style={{ background:"#e9ecef",borderRadius:4,height:6 }}>
+            <div style={{ width:`${pct}%`,height:"100%",borderRadius:4,background:totalUsed>authorized?"#dc3545":pct>=90?"#856404":TEAL,transition:"width 0.3s" }} />
+          </div>
+          <div style={{ fontSize:10,color:"#6c757d",marginTop:3 }}>{totalUsed}h used of {authorized}h authorized ({pct}%)</div>
+        </div>
+        <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:4 }}>
+          {[["PO",project.poHours],["Auth",authorized],["Plan",plannedHours],["Actual",totalUsed]].map(([l,v])=>(
+            <div key={l} style={{ textAlign:"center",padding:"3px 4px",background:"#f8f9fa",borderRadius:4,border:"1px solid #e9ecef" }}>
+              <div style={{ fontSize:11,fontWeight:700,color:l==="Actual"&&v>authorized?"#dc3545":TEAL_DARK }}>{v}h</div>
+              <div style={{ fontSize:9,color:"#6c757d" }}>{l}</div>
+            </div>
+          ))}
         </div>
       </td>
       <td style={{ padding:"12px 16px",fontSize:12,color:"#6c757d",textAlign:"center" }}>
         {new Date(project.targetDate).toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"})}
       </td>
-      <td style={{ padding:"12px 16px",fontSize:12,textAlign:"center" }}>
-        {project.status==="active"
-          ? <span style={{ color:effStatus==="overdue"?"#dc3545":daysLeft<14?"#856404":"#28a745",fontWeight:700 }}>
-              {effStatus==="overdue"?`${Math.abs(daysLeft)}d over`:`${daysLeft}d`}
-            </span>
-          : <span style={{ color:"#adb5bd" }}>—</span>}
-      </td>
     </tr>
   );
 }
-
 // ── Timeline ──────────────────────────────────────────────────────────────────
 function MilestoneTimeline({ projects, customers, filter }) {
   const today = new Date();
@@ -467,10 +468,9 @@ export default function Dashboard({ state, onSelectProject }) {
                 <col style={{ width:"22%" }} />
                 <col style={{ width:"13%" }} />
                 <col style={{ width:"10%" }} />
-                <col style={{ width:"12%" }} />
-                <col style={{ width:"18%" }} />
                 <col style={{ width:"13%" }} />
-                <col style={{ width:"12%" }} />
+                <col style={{ width:"28%" }} />
+                <col style={{ width:"14%" }} />
               </colgroup>
               <thead>
                 <tr style={{ background:TEAL }}>
@@ -481,7 +481,7 @@ export default function Dashboard({ state, onSelectProject }) {
                     { field:"lead",    label:"Lead",          align:"left",   noSort:true },
                     { field:"hours",   label:"Progress",      align:"left",   noSort:true },
                     { field:"target",  label:"Complete Date", align:"left"   },
-                    { field:"days",    label:"Days Left",     align:"center", noSort:true },
+                    
                   ].map(col => (
                     <th key={col.field}
                       onClick={() => {
