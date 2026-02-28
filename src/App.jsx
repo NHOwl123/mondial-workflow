@@ -506,6 +506,12 @@ export default function App() {
     setActiveNav("projects");
   }
 
+const filteredEntities = useMemo(() => filterEntity!=="all" ? ENTITIES.filter(e=>e===filterEntity) : ENTITIES, [filterEntity]);
+  const visibleEntities  = useMemo(() => {
+    if (filterStatus==="all") return filteredEntities;
+    return filteredEntities.filter(e => tasks.some(t => { const c=cells[`${e}::${t.id}`]; return c&&c.status===filterStatus; }));
+  }, [filterStatus, filteredEntities, cells, tasks]);
+
   // ── Loading screen ─────────────────────────────────────────────────────────
   if (!authLoaded || !users) {
     return (
@@ -553,11 +559,7 @@ export default function App() {
   const key  = selected ? `${selected.entity}::${selected.taskId}` : null;
   const cell = key ? cells[key] : null;
 
-  const filteredEntities = useMemo(() => filterEntity!=="all" ? ENTITIES.filter(e=>e===filterEntity) : ENTITIES, [filterEntity]);
-  const visibleEntities  = useMemo(() => {
-    if (filterStatus==="all") return filteredEntities;
-    return filteredEntities.filter(e => tasks.some(t => { const c=cells[`${e}::${t.id}`]; return c&&c.status===filterStatus; }));
-  }, [filterStatus, filteredEntities, cells, tasks]);
+  
 
   function entityCount(entity) { const done=tasks.filter(t=>cells[`${entity}::${t.id}`]?.status==="complete").length; return {done,total:tasks.length}; }
   function taskColCount(taskId) { const done=ENTITIES.filter(e=>cells[`${e}::${taskId}`]?.status==="complete").length; return {done,total:ENTITIES.length}; }
