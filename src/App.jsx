@@ -3,6 +3,8 @@ import ProjectTracking from "./ProjectTracking/index.jsx";
 import LoginPage from "./LoginPage.jsx";
 import AdminPage from "./AdminPage.jsx";
 import { loadUsers, saveUsers, resolveSession, logout, fullName, initials } from "./auth.js";
+import { db } from "./firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const TEAL       = "#1a7f8e";
@@ -141,12 +143,25 @@ function calcUltimateOwnership(relationships, rootId, hierarchyType) {
 function suggestMethod(pct) { return pct > 50 ? "FULL" : pct >= 20 ? "EQUITY" : "NONE"; }
 
 // ─── Storage helpers ──────────────────────────────────────────────────────────
-const HIER_KEY = "mondial-hierarchies-v1";
+
+Const HIER_KEY = "hierarchies";   // Firestore document id inside "app-data" collection
+
 async function loadHierarchyData() {
-  try { const r = await window.storage.get(HIER_KEY, true); return r ? JSON.parse(r.value) : null; } catch { return null; }
+  try {
+    const snap = await getDoc(doc(db, "app-data", HIER_KEY));
+    return snap.exists() ? snap.data() : null;
+  } catch (e) {
+    console.error("Failed to load hierarchy data", e);
+    return null;
+  }
 }
+
 async function saveHierarchyData(data) {
-  try { await window.storage.set(HIER_KEY, JSON.stringify(data), true); } catch (e) { console.error(e); }
+  try {
+    await setDoc(doc(db, "app-data", HIER_KEY), data);
+  } catch (e) {
+    console.error("Failed to save hierarchy data", e);
+  }
 }
 
 // ─── Small shared components ──────────────────────────────────────────────────
