@@ -431,13 +431,38 @@ function CategoriesSetup({ state, onUpdate }) {
 
   // Drag & drop reorder within / across categories
   function onDragStart(subId) { dragItem.current = subId; }
-  function onDragEnterCat(catId) { dragOver.current = catId; }
+  function onDragEnterSub(subId) { dragOver.current = subId; }
   function onDrop(targetCatId) {
     if (!dragItem.current) return;
-    const sub = state.subcategories.find(s => s.id === dragItem.current);
-    if (!sub) return;
-    onUpdate("subcategories", state.subcategories.map(s => s.id === dragItem.current ? { ...s, categoryId: targetCatId } : s));
+    const draggedId = dragItem.current;
+    const targetId  = dragOver.current;
     dragItem.current = null;
+    dragOver.current = null;
+
+    const subs = state.subcategories;
+    const dragged = subs.find(s => s.id === draggedId);
+    if (!dragged) return;
+
+    // Moving to a different category with no specific target sub — append at end
+    if (!targetId || targetId === draggedId) {
+      onUpdate("subcategories", subs.map(s => s.id === draggedId ? { ...s, categoryId: targetCatId } : s));
+      return;
+    }
+
+    const target = subs.find(s => s.id === targetId);
+    if (!target) return;
+
+    // Build new ordered list
+    const catSubs = subs.filter(s => s.categoryId === targetCatId && s.id !== draggedId);
+    const targetIdx = catSubs.findIndex(s => s.id === targetId);
+    catSubs.splice(targetIdx, 0, { ...dragged, categoryId: targetCatId });
+
+    // Assign order values
+    const reordered = catSubs.map((s, i) => ({ ...s, order: i }));
+
+    // Rebuild full subcategory list
+    const others = subs.filter(s => s.categoryId !== targetCatId && s.id !== draggedId);
+    onUpdate("subcategories", [...others, ...reordered]);
   }
 
   return (
@@ -455,11 +480,28 @@ function CategoriesSetup({ state, onUpdate }) {
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:13 }}>
             <thead><tr style={{background:"#f8f9fa"}}>{["Order","Name","Status",""].map(h=><th key={h} style={{padding:"8px 12px",textAlign:"left",fontWeight:600,fontSize:11,color:"#6c757d"}}>{h}</th>)}</tr></thead>
             <tbody>
-              {state.categories.map((c,i)=>{
+              {[...state.categories].sort((a,b)=>a.order-b.order).map((c,i,arr)=>{
                 const canDel = !catHasSubs(c.id) && !catInProjects(c.id);
+                function moveCategory(dir) {
+                  const sorted = [...state.categories].sort((a,b)=>a.order-b.order);
+                  const idx = sorted.findIndex(x=>x.id===c.id);
+                  const swapIdx = idx+dir;
+                  if (swapIdx<0||swapIdx>=sorted.length) return;
+                  const newCats = state.categories.map(x=>{
+                    if (x.id===sorted[idx].id) return {...x,order:sorted[swapIdx].order};
+                    if (x.id===sorted[swapIdx].id) return {...x,order:sorted[idx].order};
+                    return x;
+                  });
+                  onUpdate("categories",newCats);
+                }
                 return (
                   <tr key={c.id} style={{ borderTop:"1px solid #f0f2f4",background:i%2===0?"#fff":"#f8f9fa" }}>
-                    <td style={{padding:"10px 12px",color:"#6c757d"}}>{c.order}</td>
+                    <td style={{padding:"10px 12px"}}>
+                      <div style={{display:"flex",gap:2,alignItems:"center"}}>
+                        <button onClick={()=>moveCategory(-1)} disabled={i===0} style={{border:"1px solid #ced4da",borderRadius:4,background:"#fff",cursor:i===0?"not-allowed":"pointer",padding:"1px 6px",fontSize:11,color:"#6c757d",opacity:i===0?0.3:1}}>▲</button>
+                        <button onClick={()=>moveCategory(1)} disabled={i===arr.length-1} style={{border:"1px solid #ced4da",borderRadius:4,background:"#fff",cursor:i===arr.length-1?"not-allowed":"pointer",padding:"1px 6px",fontSize:11,color:"#6c757d",opacity:i===arr.length-1?0.3:1}}>▼</button>
+                      </div>
+                    </td>
                     <td style={{padding:"10px 12px",fontWeight:600}}>{c.name}</td>
                     <td style={{padding:"10px 12px"}}>
                       <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:c.active?"#d4edda":"#e9ecef",color:c.active?"#155724":"#6c757d",fontWeight:700}}>
@@ -488,7 +530,7 @@ function CategoriesSetup({ state, onUpdate }) {
       {tab === "subcategories" && (
         <Section title="Sub-categories" action={<button onClick={openAddSub} style={btnPrimary}>+ Add</button>}>
           <p style={{ fontSize: 12, color: "#6c757d", marginTop: 0, marginBottom: 16 }}>Drag sub-categories between category groups to reassign them.</p>
-          {state.categories.filter(c=>c.active).map(cat=>{
+          {[...state.categories].filter(c=>c.active).sort((a,b)=>a.order-b.order).map(cat=>{
             const subs = state.subcategories.filter(s=>s.categoryId===cat.id);
             return (
               <div key={cat.id} style={{marginBottom:20}}
@@ -496,7 +538,7 @@ function CategoriesSetup({ state, onUpdate }) {
                 onDrop={()=>onDrop(cat.id)}>
                 <div style={{fontSize:12,fontWeight:700,color:TEAL_DARK,marginBottom:8,textTransform:"uppercase",letterSpacing:0.5,padding:"6px 10px",background:TEAL_LIGHT,borderRadius:6}}>{cat.name}</div>
                 {subs.length === 0 && <div style={{fontSize:12,color:"#adb5bd",fontStyle:"italic",padding:"8px 10px"}}>Drop sub-categories here</div>}
-                {subs.map((s,i)=>{
+                {[...subs].sort((a,b)=>(a.order??0)-(b.order??0)).map((s,i)=>{
                   const canDel = !subInProjects(s.id);
                   if (editSubId === s.id) {
                     return (
@@ -513,6 +555,8 @@ function CategoriesSetup({ state, onUpdate }) {
                   return (
                     <div key={s.id} draggable
                       onDragStart={()=>onDragStart(s.id)}
+                      onDragEnter={()=>onDragEnterSub(s.id)}
+                      onDragOver={e=>e.preventDefault()}
                       style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:i%2===0?"#fff":"#f8f9fa",borderRadius:6,marginBottom:4,border:"1px solid #f0f2f4",cursor:"grab"}}>
                       <span style={{color:"#adb5bd",fontSize:14}}>⠿</span>
                       <span style={{flex:1,fontWeight:500,fontSize:13}}>{s.name}</span>
