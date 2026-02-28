@@ -2,6 +2,8 @@
 import { useState, useEffect } from "react";
 import { createUser, updateUser, resetPassword, toggleUserActive, deleteUser, fullName } from "./auth";
 import { loadBackups, createBackup, restoreBackup, deleteBackup, loadPSAData, savePSAData, buildInitialState } from "./ProjectTracking/data";
+import HelpModal, { HelpButton } from "./ProjectTracking/HelpModal";
+import { helpContent } from "./ProjectTracking/helpContent";
 
 const TEAL       = "#1a7f8e";
 const TEAL_DARK  = "#145f6b";
@@ -305,21 +307,21 @@ function DataTab() {
     setWorking(false);
   }
 
- async function handleRestore(backupId) {
-  setWorking(true);
-  try {
-    const current = await loadPSAData();
-    if (current) {
-      const label = `Pre-restore backup — ${new Date().toLocaleString("en-GB")}`;
-      const updated = await createBackup(current, label);
-      setBackups(updated);
-    }
-    await restoreBackup(backupId);
-    flash("Data restored successfully. Refresh the page to see the changes.");
-  } catch (e) { err("Restore failed: " + e.message); }
-  setWorking(false);
-  setConfirmAct(null);
-}
+  async function handleRestore(backupId) {
+    setWorking(true);
+    try {
+      const current = await loadPSAData();
+      if (current) {
+        const label = `Pre-restore backup — ${new Date().toLocaleString("en-GB")}`;
+        const updated = await createBackup(current, label);
+        setBackups(updated);
+      }
+      await restoreBackup(backupId);
+      flash("Data restored successfully. Refresh the page to see the changes.");
+    } catch (e) { err("Restore failed: " + e.message); }
+    setWorking(false);
+    setConfirmAct(null);
+  }
 
   async function handleDelete(backupId) {
     setWorking(true);
@@ -335,7 +337,6 @@ function DataTab() {
   async function handleReset() {
     setWorking(true);
     try {
-      // Auto-backup before reset
       const current = await loadPSAData();
       if (current) {
         const label = `Pre-reset backup — ${new Date().toLocaleString("en-GB")}`;
@@ -371,9 +372,7 @@ function DataTab() {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      // Basic validation
       if (!data.projects || !data.customers) { err("Invalid data file — missing required fields."); return; }
-      // Auto-backup before import
       const current = await loadPSAData();
       if (current) {
         const label = `Pre-import backup — ${new Date().toLocaleString("en-GB")}`;
@@ -469,9 +468,16 @@ function DataTab() {
   );
 }
 
+// ─── Help key map: tab id → helpContent key ───────────────────────────────────
+const TAB_HELP = {
+  users: "adminUsers",
+  data:  "adminData",
+};
+
 // ─── Main AdminPage ───────────────────────────────────────────────────────────
 export default function AdminPage({ users, currentUser, onUsersChange }) {
-  const [tab, setTab] = useState("users");
+  const [tab,      setTab]      = useState("users");
+  const [showHelp, setShowHelp] = useState(false);
 
   return (
     <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", padding:24, gap:16, background:"#f4f6f9", fontFamily:"'Segoe UI', Arial, sans-serif" }}>
@@ -481,17 +487,20 @@ export default function AdminPage({ users, currentUser, onUsersChange }) {
         <p style={{ margin:"4px 0 0", fontSize:13, color:"#6c757d" }}>Manage users and application data.</p>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display:"flex", borderBottom:"2px solid #dee2e6", gap:0 }}>
-        {[["users","👥 User Management"],["data","🗄 Data Management"]].map(([id,label])=>(
-          <div key={id} onClick={()=>setTab(id)}
-            style={{ padding:"10px 20px", cursor:"pointer", fontSize:13, fontWeight:600,
-              color: tab===id ? TEAL : "#6c757d",
-              borderBottom: tab===id ? `2px solid ${TEAL}` : "2px solid transparent",
-              marginBottom:-2 }}>
-            {label}
-          </div>
-        ))}
+      {/* Tabs + help button */}
+      <div style={{ display:"flex", alignItems:"center", borderBottom:"2px solid #dee2e6" }}>
+        <div style={{ display:"flex", gap:0, flex:1 }}>
+          {[["users","👥 User Management"],["data","🗄 Data Management"]].map(([id,label])=>(
+            <div key={id} onClick={()=>setTab(id)}
+              style={{ padding:"10px 20px", cursor:"pointer", fontSize:13, fontWeight:600,
+                color: tab===id ? TEAL : "#6c757d",
+                borderBottom: tab===id ? `2px solid ${TEAL}` : "2px solid transparent",
+                marginBottom:-2 }}>
+              {label}
+            </div>
+          ))}
+        </div>
+        <HelpButton onClick={() => setShowHelp(true)} style={{ marginBottom: 4 }} />
       </div>
 
       {/* Tab content */}
@@ -499,6 +508,11 @@ export default function AdminPage({ users, currentUser, onUsersChange }) {
         {tab==="users" && <UsersTab users={users} currentUser={currentUser} onUsersChange={onUsersChange} />}
         {tab==="data"  && <DataTab />}
       </div>
+
+      {/* Help modal — content changes with active tab */}
+      {showHelp && (
+        <HelpModal content={helpContent[TAB_HELP[tab]]} onClose={() => setShowHelp(false)} />
+      )}
     </div>
   );
 }

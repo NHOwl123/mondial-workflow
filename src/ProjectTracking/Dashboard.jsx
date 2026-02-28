@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
+import HelpModal, { HelpButton } from "./HelpModal.jsx";
+import { helpContent } from "./helpContent";
 
 const TEAL = "#1a7f8e";
 const TEAL_DARK = "#145f6b";
@@ -132,6 +134,7 @@ function ProjectRow({ project, customer, oem, consultants, onClick }) {
     </tr>
   );
 }
+
 // ── Timeline ──────────────────────────────────────────────────────────────────
 function MilestoneTimeline({ projects, customers, filter }) {
   const today = new Date();
@@ -184,6 +187,7 @@ export default function Dashboard({ state, onSelectProject }) {
 
   const [view, setView] = useState("list"); // list | cards | timeline
   const [timelineFilter, setTimelineFilter] = useState("active");
+  const [showHelp, setShowHelp] = useState(false);
 
   // Filter state
   const [filterStatuses, setFilterStatuses] = useState(["not-started","active","overdue","inactive","closed"]);
@@ -395,6 +399,10 @@ export default function Dashboard({ state, onSelectProject }) {
         )}
 
         <span style={{ marginLeft:"auto",fontSize:12,color:"#6c757d" }}>{filteredProjects.length} project{filteredProjects.length!==1?"s":""}</span>
+
+        {/* Help button */}
+        <HelpButton onClick={() => setShowHelp(true)} />
+
         {view==="list" && (
           <button onClick={exportToExcel} style={{ background:"#1d6f42",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:6 }}>
             ⬇ Export to Excel
@@ -482,7 +490,6 @@ export default function Dashboard({ state, onSelectProject }) {
                     { field:"lead",    label:"Lead",          align:"left",   noSort:true },
                     { field:"hours",   label:"Progress",      align:"left",   noSort:true },
                     { field:"target",  label:"Complete Date", align:"left"   },
-                    
                   ].map(col => (
                     <th key={col.field}
                       onClick={() => {
@@ -549,6 +556,11 @@ export default function Dashboard({ state, onSelectProject }) {
           </div>
         )}
       </div>
+
+      {/* Help modal */}
+      {showHelp && (
+        <HelpModal content={helpContent.dashboard} onClose={() => setShowHelp(false)} />
+      )}
     </div>
   );
 }

@@ -1,4 +1,6 @@
 import { useState, useRef } from "react";
+import HelpModal, { HelpButton } from "./HelpModal.jsx";
+import { helpContent } from "./helpContent.js";
 
 const TEAL = "#1a7f8e";
 const TEAL_DARK = "#145f6b";
@@ -123,7 +125,7 @@ function OverviewTab({ project, state, onUpdate }) {
     ["Users", project.users],
     ["Multi-Currency", project.multiCurrency?"Yes":"No"],
     ["Dedicated Server", project.dedicatedServer?"Yes":"No"],
-     ["PO Hours", `${project.poHours}h`],
+    ["PO Hours", `${project.poHours}h`],
     ["Authorized Hours", `${project.authorizedHours ?? project.poHours}h`],
     ["Planned Hours", `${totalPlanned}h`],
   ];
@@ -212,13 +214,19 @@ function OverviewTab({ project, state, onUpdate }) {
         {totalUsed > project.poHours && (
           <div style={{ background:"#f8d7da",borderRadius:12,padding:16,border:"1px solid #dc3545" }}>
             <div style={{ fontSize:12,fontWeight:700,color:"#721c24" }}>⚠ Actual Hours Exceed PO</div>
-            <div style={{ fontSize:12,color:"#721c24",marginTop:4 }}>Actual hours used ({totalUsed}h) exceed the PO ({project.poHours}h) by {totalUsed-project.poHours}h.</div>
+            <div style={{ fontSize:12,color:"#721c24",marginTop:4 }}>Actual hours used ({totalUsed}h) exceed PO ({project.poHours}h) by {totalUsed-project.poHours}h.</div>
           </div>
         )}
-        {totalUsed > (project.authorizedHours ?? project.poHours) && totalUsed <= project.poHours && (
+        {totalUsed > (project.authorizedHours??project.poHours) && totalUsed<=project.poHours && (
+          <div style={{ background:"#f8d7da",borderRadius:12,padding:16,border:"1px solid #dc3545" }}>
+            <div style={{ fontSize:12,fontWeight:700,color:"#721c24" }}>⚠ Actual Hours Exceed Authorized Hours</div>
+            <div style={{ fontSize:12,color:"#721c24",marginTop:4 }}>Actual hours used ({totalUsed}h) exceed Authorized Hours ({project.authorizedHours??project.poHours}h) by {totalUsed-(project.authorizedHours??project.poHours)}h.</div>
+          </div>
+        )}
+        {totalUsed > totalPlanned && totalPlanned > 0 && totalUsed<=(project.authorizedHours??project.poHours) && (
           <div style={{ background:"#fff3cd",borderRadius:12,padding:16,border:"1px solid #ffc107" }}>
-            <div style={{ fontSize:12,fontWeight:700,color:"#856404" }}>⚠ Actual Hours Exceed Authorized Hours</div>
-            <div style={{ fontSize:12,color:"#856404",marginTop:4 }}>Actual hours used ({totalUsed}h) exceed Authorized Hours ({project.authorizedHours ?? project.poHours}h) by {totalUsed-(project.authorizedHours??project.poHours)}h.</div>
+            <div style={{ fontSize:12,fontWeight:700,color:"#856404" }}>⚠ Actual Hours Exceed Planned Hours</div>
+            <div style={{ fontSize:12,color:"#856404",marginTop:4 }}>Actual hours used ({totalUsed}h) exceed Planned Hours ({totalPlanned}h) by {totalUsed-totalPlanned}h.</div>
           </div>
         )}
       </div>
@@ -348,22 +356,19 @@ function CategoriesTab({ project, state, onUpdate }) {
   const { categories, subcategories, consultants, templates } = state;
   const teamConsultants = consultants.filter(u => project.consultantIds.includes(u.id));
 
-  // drag refs for category rows and sub-category rows
   const dragCatIdx = useRef(null);
-  const dragSubKey = useRef(null); // "catId::subId"
+  const dragSubKey = useRef(null);
 
-  const [logModal, setLogModal] = useState(null); // { catId, subId }
+  const [logModal, setLogModal] = useState(null);
   const [logEntry, setLogEntry] = useState({ userId:"", hours:"", date: new Date().toISOString().slice(0,10) });
   const [addCatModal, setAddCatModal] = useState(false);
   const [addCatId, setAddCatId] = useState("");
-  const [addSubModal, setAddSubModal] = useState(null); // catId
+  const [addSubModal, setAddSubModal] = useState(null);
   const [addSubId, setAddSubId] = useState("");
-  const [editPlanned, setEditPlanned] = useState(null); // { catId, subId, val }
+  const [editPlanned, setEditPlanned] = useState(null);
   const [applyTmplModal, setApplyTmplModal] = useState(false);
   const [tmplId, setTmplId] = useState("");
 
-  // Flatten project categories into a structured list
-  // project.categories: [{ categoryId, subcategoryId?, plannedHours, usedHours, status, assignedUserId, hoursLog:[] }]
   const cats = project.categories;
 
   function getConsultantName(uid) {
@@ -436,7 +441,6 @@ function CategoriesTab({ project, state, onUpdate }) {
     setApplyTmplModal(false);
   }
 
-  // Drag category order
   function onDragCatStart(idx) { dragCatIdx.current = idx; }
   function onDropCat(idx) {
     if (dragCatIdx.current===null||dragCatIdx.current===idx) return;
@@ -447,14 +451,12 @@ function CategoriesTab({ project, state, onUpdate }) {
     dragCatIdx.current = null;
   }
 
-  // Move sub to another cat
   function moveSubToCat(subId, fromCatId, toCatId) {
     onUpdate({ ...project, categories: project.categories.map(c =>
       c.categoryId===fromCatId && c.subcategoryId===subId ? { ...c, categoryId: toCatId } : c
     )});
   }
 
-  // Group for display
   const catIds = [...new Set(cats.map(c=>c.categoryId))];
 
   return (
@@ -464,7 +466,6 @@ function CategoriesTab({ project, state, onUpdate }) {
         <button onClick={()=>setAddCatModal(true)} style={btnPrimary}>+ Add Category</button>
       </div>
 
-      {/* Grid header */}
       <div style={{ background:"#fff",borderRadius:12,border:"1px solid #e9ecef",overflow:"hidden" }}>
         <table style={{ width:"100%",borderCollapse:"collapse",fontSize:12 }}>
           <thead>
@@ -489,7 +490,6 @@ function CategoriesTab({ project, state, onUpdate }) {
               const unusedSubs = subcategories.filter(s=>s.categoryId===catId && !cats.some(c=>c.subcategoryId===s.id));
 
               return [
-                // Category header row
                 <tr key={`cat-${catId}`}
                   draggable
                   onDragStart={()=>onDragCatStart(catGroupIdx)}
@@ -508,7 +508,6 @@ function CategoriesTab({ project, state, onUpdate }) {
                   </td>
                 </tr>,
 
-                // Cat main row (if exists)
                 ...catMain ? [
                   <tr key={`catmain-${catId}`} style={{ borderBottom:"1px solid #f0f2f4",background:"#fff" }}>
                     <td></td>
@@ -547,7 +546,6 @@ function CategoriesTab({ project, state, onUpdate }) {
                   </tr>
                 ] : [],
 
-                // Sub-category rows
                 ...catSubs.map((cat, subIdx) => {
                   const subDef = subcategories.find(s=>s.id===cat.subcategoryId);
                   return (
@@ -594,7 +592,6 @@ function CategoriesTab({ project, state, onUpdate }) {
                   );
                 }),
 
-                // Hours log detail rows
                 ...catRows.flatMap(cat => (cat.hoursLog||[]).length>0 ? [
                   <tr key={`log-${catId}-${cat.subcategoryId||"main"}`} style={{ background:"#f8f9fa" }}>
                     <td colSpan={7} style={{ padding:"4px 12px 4px 48px" }}>
@@ -618,7 +615,6 @@ function CategoriesTab({ project, state, onUpdate }) {
         </table>
       </div>
 
-      {/* Log Hours Modal */}
       {logModal && (
         <Modal title="Log Hours" onClose={()=>setLogModal(null)} onSave={logHours} saveLabel="Log Hours">
           <div><label style={labelStyle}>Consultant</label>
@@ -632,7 +628,6 @@ function CategoriesTab({ project, state, onUpdate }) {
         </Modal>
       )}
 
-      {/* Apply Template Modal */}
       {applyTmplModal && (
         <Modal title="Apply Template" onClose={()=>setApplyTmplModal(false)} onSave={applyTemplate} saveLabel="Apply">
           <p style={{ fontSize:12,color:"#6c757d",margin:0 }}>⚠ Applying a template will replace the current category list. Hours already logged will be lost.</p>
@@ -645,7 +640,6 @@ function CategoriesTab({ project, state, onUpdate }) {
         </Modal>
       )}
 
-      {/* Add Category Modal */}
       {addCatModal && (
         <Modal title="Add Category" onClose={()=>setAddCatModal(false)} onSave={addCategory} saveLabel="Add">
           <div><label style={labelStyle}>Category</label>
@@ -657,7 +651,6 @@ function CategoriesTab({ project, state, onUpdate }) {
         </Modal>
       )}
 
-      {/* Add Sub-category Modal */}
       {addSubModal && (
         <Modal title="Add Sub-category" onClose={()=>setAddSubModal(null)} onSave={addSubcategory} saveLabel="Add">
           <div><label style={labelStyle}>Sub-category</label>
@@ -814,10 +807,20 @@ function DocumentsTab({ project, state, onUpdate }) {
   );
 }
 
+// ── Help key map: tab name → helpContent key ──────────────────────────────────
+const TAB_HELP = {
+  overview:   "projectOverview",
+  team:       "projectTeam",
+  categories: "projectCategories",
+  milestones: "projectMilestones",
+  documents:  "projectDocuments",
+};
+
 // ── Main ProjectDetail ────────────────────────────────────────────────────────
 export default function ProjectDetail({ project, state, onUpdate, onBack }) {
   const { customers, oemPartners } = state;
   const [tab, setTab] = useState("overview");
+  const [showHelp, setShowHelp] = useState(false);
 
   const customer = customers.find(c=>c.id===project.customerId);
   const oem = oemPartners.find(o=>{ const cust=customers.find(c=>c.id===project.customerId); return o.id===cust?.oemId; });
@@ -849,13 +852,17 @@ export default function ProjectDetail({ project, state, onUpdate, onBack }) {
             </div>
           </div>
         </div>
-        <div style={{ display:"flex",gap:0,marginTop:14 }}>
-          {tabs.map(t=>(
-            <button key={t} onClick={()=>setTab(t)}
-              style={{ padding:"8px 20px",border:"none",borderBottom:tab===t?`2px solid ${TEAL}`:"2px solid transparent",background:"none",cursor:"pointer",fontSize:13,fontWeight:600,color:tab===t?TEAL:"#6c757d",textTransform:"capitalize" }}>
-              {t}
-            </button>
-          ))}
+        {/* Tab bar with help button */}
+        <div style={{ display:"flex",alignItems:"center",marginTop:14 }}>
+          <div style={{ display:"flex",gap:0 }}>
+            {tabs.map(t=>(
+              <button key={t} onClick={()=>setTab(t)}
+                style={{ padding:"8px 20px",border:"none",borderBottom:tab===t?`2px solid ${TEAL}`:"2px solid transparent",background:"none",cursor:"pointer",fontSize:13,fontWeight:600,color:tab===t?TEAL:"#6c757d",textTransform:"capitalize" }}>
+                {t}
+              </button>
+            ))}
+          </div>
+          <HelpButton onClick={() => setShowHelp(true)} style={{ marginLeft:10 }} />
         </div>
       </div>
 
@@ -866,6 +873,11 @@ export default function ProjectDetail({ project, state, onUpdate, onBack }) {
         {tab==="milestones"  && <MilestonesTab project={project} onUpdate={onUpdate} />}
         {tab==="documents"   && <DocumentsTab  project={project} state={state} onUpdate={onUpdate} />}
       </div>
+
+      {/* Help modal — content changes with active tab */}
+      {showHelp && (
+        <HelpModal content={helpContent[TAB_HELP[tab]]} onClose={() => setShowHelp(false)} />
+      )}
     </div>
   );
 }

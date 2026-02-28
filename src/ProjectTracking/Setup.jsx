@@ -1,4 +1,6 @@
 import { useState, useRef } from "react";
+import HelpModal, { HelpButton } from "./HelpModal.jsx";
+import { helpContent } from "./helpContent.js";
 
 const TEAL = "#1a7f8e";
 const TEAL_DARK = "#145f6b";
@@ -149,13 +151,11 @@ function CustomersSetup({ state, onUpdate }) {
   const [custForm, setCustForm] = useState({ name: "", oemId: "", contacts: [] });
   const [contactRow, setContactRow] = useState({ name: "", email: "", title: "" });
 
-  // OEM helpers
   function openAddOem() {
     setOemForm({ name: "", contacts: [], active: true });
     setOemEditId(null); setOemModal(true);
   }
   function openEditOem(o) {
-    // Migrate legacy string contact to contacts array
     let contacts = o.contacts || [];
     if (!contacts.length && o.contact) contacts = [{ name: o.contact, email: o.email || "", primary: true }];
     setOemForm({ ...o, contacts });
@@ -164,7 +164,6 @@ function CustomersSetup({ state, onUpdate }) {
   function saveOem() {
     if (!oemForm.name) return;
     const data = { ...oemForm };
-    // Ensure exactly one primary
     if (data.contacts.length > 0 && !data.contacts.some(c => c.primary)) {
       data.contacts = data.contacts.map((c, i) => ({ ...c, primary: i === 0 }));
     }
@@ -179,7 +178,6 @@ function CustomersSetup({ state, onUpdate }) {
     if (!oemContactRow.name) return;
     const contacts = [...oemForm.contacts, { ...oemContactRow }];
     if (oemContactRow.primary) {
-      // make only this one primary
       contacts.forEach((c, i) => { if (i < contacts.length - 1) c.primary = false; });
     }
     setOemForm(p => ({ ...p, contacts }));
@@ -198,11 +196,10 @@ function CustomersSetup({ state, onUpdate }) {
     return state.customers.some(c => c.oemId === oemId);
   }
   function toggleOemActive(o) {
-    if (!o.active && oemHasCustomers(o.id)) return; // can't deactivate with customers — shouldn't reach here
+    if (!o.active && oemHasCustomers(o.id)) return;
     onUpdate("oemPartners", state.oemPartners.map(x => x.id === o.id ? { ...x, active: !x.active } : x));
   }
 
-  // Customer helpers
   function openAddCust() {
     setCustForm({ name: "", oemId: "", contacts: [] });
     setCustEditId(null); setCustModal(true);
@@ -236,7 +233,6 @@ function CustomersSetup({ state, onUpdate }) {
     setCustForm(p => ({ ...p, contacts }));
   }
 
-  // Display helper: get primary contact
   function getPrimary(contacts) {
     if (!contacts || !contacts.length) return null;
     return contacts.find(c => c.primary) || contacts[0];
@@ -246,7 +242,6 @@ function CustomersSetup({ state, onUpdate }) {
 
   return (
     <>
-      {/* OEM Partners */}
       <Section title="OEM Partners" action={<button onClick={openAddOem} style={btnPrimary}>+ Add OEM</button>}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead><tr style={{ background: "#f8f9fa" }}>
@@ -271,9 +266,7 @@ function CustomersSetup({ state, onUpdate }) {
                     <div style={{ display:"flex",gap:6 }}>
                       <button onClick={() => openEditOem(o)} style={{ ...btnGhost, padding:"4px 10px",fontSize:11 }}>Edit</button>
                       {isActive
-                        ? <button
-                            onClick={() => !hasCustomers && toggleOemActive(o)}
-                            disabled={hasCustomers}
+                        ? <button onClick={() => !hasCustomers && toggleOemActive(o)} disabled={hasCustomers}
                             title={hasCustomers ? "Cannot deactivate: has associated customers" : "Deactivate"}
                             style={{ ...btnGhost, padding:"4px 10px", fontSize:11, opacity: hasCustomers ? 0.4 : 1, cursor: hasCustomers ? "not-allowed" : "pointer" }}>
                             Deactivate
@@ -289,7 +282,6 @@ function CustomersSetup({ state, onUpdate }) {
         </table>
       </Section>
 
-      {/* Customers */}
       <Section title="Customers" action={<button onClick={openAddCust} style={btnPrimary}>+ Add Customer</button>}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead><tr style={{ background: "#f8f9fa" }}>
@@ -314,7 +306,6 @@ function CustomersSetup({ state, onUpdate }) {
         </table>
       </Section>
 
-      {/* OEM Modal */}
       {oemModal && (
         <Modal title={oemEditId ? "Edit OEM Partner" : "Add OEM Partner"} onClose={() => setOemModal(false)} onSave={saveOem} width={520}>
           <div><label style={labelStyle}>Partner Name *</label><input value={oemForm.name} onChange={e=>setOemForm(p=>({...p,name:e.target.value}))} style={inputStyle} /></div>
@@ -339,7 +330,6 @@ function CustomersSetup({ state, onUpdate }) {
         </Modal>
       )}
 
-      {/* Customer Modal */}
       {custModal && (
         <Modal title={custEditId ? "Edit Customer" : "Add Customer"} onClose={() => setCustModal(false)} onSave={saveCust} width={520}>
           <div><label style={labelStyle}>Customer Name *</label><input value={custForm.name} onChange={e=>setCustForm(p=>({...p,name:e.target.value}))} style={inputStyle} /></div>
@@ -384,7 +374,6 @@ function CategoriesSetup({ state, onUpdate }) {
   const [editSubId, setEditSubId] = useState(null);
   const [editSubForm, setEditSubForm] = useState({ name: "", categoryId: "" });
 
-  // Drag state for sub-categories
   const dragItem = useRef(null);
   const dragOver = useRef(null);
 
@@ -429,7 +418,6 @@ function CategoriesSetup({ state, onUpdate }) {
     onUpdate("subcategories", state.subcategories.map(s => s.id === id ? {...s, active: !s.active} : s));
   }
 
-  // Drag & drop reorder within / across categories
   function onDragStart(subId) { dragItem.current = subId; }
   function onDragEnterSub(subId) { dragOver.current = subId; }
   function onDrop(targetCatId) {
@@ -443,7 +431,6 @@ function CategoriesSetup({ state, onUpdate }) {
     const dragged = subs.find(s => s.id === draggedId);
     if (!dragged) return;
 
-    // Moving to a different category with no specific target sub — append at end
     if (!targetId || targetId === draggedId) {
       onUpdate("subcategories", subs.map(s => s.id === draggedId ? { ...s, categoryId: targetCatId } : s));
       return;
@@ -452,15 +439,11 @@ function CategoriesSetup({ state, onUpdate }) {
     const target = subs.find(s => s.id === targetId);
     if (!target) return;
 
-    // Build new ordered list
     const catSubs = subs.filter(s => s.categoryId === targetCatId && s.id !== draggedId);
     const targetIdx = catSubs.findIndex(s => s.id === targetId);
     catSubs.splice(targetIdx, 0, { ...dragged, categoryId: targetCatId });
 
-    // Assign order values
     const reordered = catSubs.map((s, i) => ({ ...s, order: i }));
-
-    // Rebuild full subcategory list
     const others = subs.filter(s => s.categoryId !== targetCatId && s.id !== draggedId);
     onUpdate("subcategories", [...others, ...reordered]);
   }
@@ -512,9 +495,7 @@ function CategoriesSetup({ state, onUpdate }) {
                       <div style={{ display:"flex",gap:6 }}>
                         <button onClick={()=>openEditCat(c)} style={{...btnGhost,padding:"4px 10px",fontSize:11}}>Edit</button>
                         <button onClick={()=>toggleCatActive(c.id)} style={{...btnGhost,padding:"4px 10px",fontSize:11}}>{c.active?"Deactivate":"Activate"}</button>
-                        <button
-                          onClick={() => canDel && deleteCat(c.id)}
-                          disabled={!canDel}
+                        <button onClick={() => canDel && deleteCat(c.id)} disabled={!canDel}
                           title={!canDel ? (catHasSubs(c.id) ? "Has sub-categories" : "Used in project(s)") : "Delete"}
                           style={{ ...btnDanger, opacity: canDel ? 1 : 0.4, cursor: canDel ? "pointer" : "not-allowed" }}>Delete</button>
                       </div>
@@ -534,7 +515,7 @@ function CategoriesSetup({ state, onUpdate }) {
             const subs = state.subcategories.filter(s=>s.categoryId===cat.id);
             return (
               <div key={cat.id} style={{marginBottom:20}}
-                onDragOver={e=>{e.preventDefault();onDragEnterCat(cat.id);}}
+                onDragOver={e=>{e.preventDefault();}}
                 onDrop={()=>onDrop(cat.id)}>
                 <div style={{fontSize:12,fontWeight:700,color:TEAL_DARK,marginBottom:8,textTransform:"uppercase",letterSpacing:0.5,padding:"6px 10px",background:TEAL_LIGHT,borderRadius:6}}>{cat.name}</div>
                 {subs.length === 0 && <div style={{fontSize:12,color:"#adb5bd",fontStyle:"italic",padding:"8px 10px"}}>Drop sub-categories here</div>}
@@ -597,7 +578,7 @@ function CategoriesSetup({ state, onUpdate }) {
 // ── Templates ─────────────────────────────────────────────────────────────────
 function TemplatesSetup({ state, onUpdate }) {
   const [selected, setSelected] = useState(null);
-  const [editing, setEditing] = useState(false); // editing template
+  const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState(null);
   const [addModal, setAddModal] = useState(false);
   const [newTmpl, setNewTmpl] = useState({ name: "", description: "", totalHours: "", startFrom: "blank", copyFromId: "" });
@@ -629,11 +610,7 @@ function TemplatesSetup({ state, onUpdate }) {
   }
 
   function startEdit(t) {
-    setEditForm({
-      ...t,
-      totalHours: t.totalHours,
-      items: t.items.map(i => ({ ...i })),
-    });
+    setEditForm({ ...t, totalHours: t.totalHours, items: t.items.map(i => ({ ...i })) });
     setEditing(true);
   }
 
@@ -649,7 +626,6 @@ function TemplatesSetup({ state, onUpdate }) {
   }
 
   function deleteTemplate(id) {
-    // Check if any project uses this template
     const inUse = state.projects.some(p => p.templateId === id);
     if (inUse) { alert("Cannot delete: template is associated with one or more projects."); return; }
     onUpdate("templates", state.templates.filter(t => t.id !== id));
@@ -657,16 +633,11 @@ function TemplatesSetup({ state, onUpdate }) {
   }
 
   function updateItem(idx, field, val) {
-    setEditForm(p => {
-      const items = p.items.map((it, i) => i === idx ? { ...it, [field]: val } : it);
-      return { ...p, items };
-    });
+    setEditForm(p => ({ ...p, items: p.items.map((it, i) => i === idx ? { ...it, [field]: val } : it) }));
   }
-
   function removeItem(idx) {
     setEditForm(p => ({ ...p, items: p.items.filter((_,i) => i !== idx) }));
   }
-
   function addItem() {
     setEditForm(p => ({ ...p, items: [...p.items, { categoryId: "", subcategoryId: null, hours: 0 }] }));
   }
@@ -684,7 +655,6 @@ function TemplatesSetup({ state, onUpdate }) {
     });
   }
 
-  // Get label for a template item
   function itemLabel(item) {
     const cat = state.categories.find(c => c.id === item.categoryId);
     const sub = item.subcategoryId ? state.subcategories.find(s => s.id === item.subcategoryId) : null;
@@ -698,7 +668,6 @@ function TemplatesSetup({ state, onUpdate }) {
 
   return (
     <div style={{ display:"grid", gridTemplateColumns:"280px 1fr", gap:20 }}>
-      {/* Left panel */}
       <div>
         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12 }}>
           <div style={{fontWeight:700,fontSize:13,color:"#2c3e50"}}>Templates</div>
@@ -717,7 +686,6 @@ function TemplatesSetup({ state, onUpdate }) {
         ))}
       </div>
 
-      {/* Right panel */}
       {tmpl && !editing && (
         <div style={{background:"#fff",borderRadius:12,padding:20,border:"1px solid #e9ecef"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
@@ -757,7 +725,6 @@ function TemplatesSetup({ state, onUpdate }) {
             </div>
           </div>
 
-          {/* Budget bar */}
           <div style={{marginBottom:16,padding:12,background:editOver?"#f8d7da":"#f0f9f0",borderRadius:8,border:`1px solid ${editOver?"#dc3545":"#28a745"}`}}>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
               <span>Allocated: <strong>{editItemSum}h</strong></span>
@@ -769,7 +736,6 @@ function TemplatesSetup({ state, onUpdate }) {
             </div>
           </div>
 
-          {/* Line items */}
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,marginBottom:12}}>
             <thead><tr style={{background:"#f8f9fa"}}>
               <th style={{width:24}}></th>
@@ -780,12 +746,7 @@ function TemplatesSetup({ state, onUpdate }) {
             </tr></thead>
             <tbody>
               {editForm.items.map((item,idx)=>(
-                <tr key={idx}
-                  draggable
-                  onDragStart={()=>onItemDragStart(idx)}
-                  onDragOver={e=>e.preventDefault()}
-                  onDrop={()=>onItemDrop(idx)}
-                  style={{borderTop:"1px solid #f0f2f4",cursor:"grab"}}>
+                <tr key={idx} draggable onDragStart={()=>onItemDragStart(idx)} onDragOver={e=>e.preventDefault()} onDrop={()=>onItemDrop(idx)} style={{borderTop:"1px solid #f0f2f4",cursor:"grab"}}>
                   <td style={{padding:"6px 4px 6px 10px",width:24,color:"#adb5bd",fontSize:16,userSelect:"none"}}>⠿</td>
                   <td style={{padding:"6px 10px"}}>
                     <select value={item.categoryId} onChange={e=>updateItem(idx,"categoryId",e.target.value)} style={{...inputStyle,padding:"5px 8px",fontSize:12}}>
@@ -800,9 +761,7 @@ function TemplatesSetup({ state, onUpdate }) {
                     </select>
                   </td>
                   <td style={{padding:"6px 10px"}}>
-                    <input type="number" min="0" step="0.5" value={item.hours}
-                      onChange={e=>updateItem(idx,"hours",parseFloat(e.target.value)||0)}
-                      style={{...inputStyle,padding:"5px 8px",fontSize:12,textAlign:"right"}} />
+                    <input type="number" min="0" step="0.5" value={item.hours} onChange={e=>updateItem(idx,"hours",parseFloat(e.target.value)||0)} style={{...inputStyle,padding:"5px 8px",fontSize:12,textAlign:"right"}} />
                   </td>
                   <td style={{padding:"6px 10px",textAlign:"center"}}>
                     <button onClick={()=>removeItem(idx)} style={{...btnDanger,padding:"3px 8px"}}>✕</button>
@@ -824,7 +783,6 @@ function TemplatesSetup({ state, onUpdate }) {
         <div style={{display:"flex",alignItems:"center",justifyContent:"center",color:"#6c757d",fontSize:13}}>Select a template to view details</div>
       )}
 
-      {/* Add Template Modal */}
       {addModal && (
         <Modal title="New Template" onClose={()=>setAddModal(false)} onSave={createTemplate} width={460}>
           <div><label style={labelStyle}>Template Name *</label><input value={newTmpl.name} onChange={e=>setNewTmpl(p=>({...p,name:e.target.value}))} style={inputStyle} placeholder="e.g. Advanced Multi-Ledger" /></div>
@@ -855,69 +813,72 @@ function TemplatesSetup({ state, onUpdate }) {
   );
 }
 
-// ── Main Setup page ───────────────────────────────────────────────────────────
-
-// Seed data for demo
+// ── Seed data ─────────────────────────────────────────────────────────────────
 const SEED_CATEGORIES = [
-  { id: "cat-setup",    name: "Setup and Configuration", active: true, order: 1 },
-  { id: "cat-training", name: "Training",                active: true, order: 2 },
-  { id: "cat-reports",  name: "Report Writing",          active: true, order: 3 },
-  { id: "cat-testing",  name: "Testing",                 active: true, order: 4 },
+  { id: "cat-setup",    name: "Setup and Configuration",      active: true, order: 1 },
+  { id: "cat-training", name: "Training",                     active: true, order: 2 },
+  { id: "cat-reports",  name: "Report Writing",               active: true, order: 3 },
+  { id: "cat-testing",  name: "Testing",                      active: true, order: 4 },
   { id: "cat-planning", name: "Planning and Review Meetings", active: true, order: 5 },
 ];
 const SEED_SUBCATEGORIES = [
-  { id: "sub-gl",       categoryId: "cat-setup",    name: "Default GL Accounts",        active: true },
-  { id: "sub-ledgers",  categoryId: "cat-setup",    name: "Ledgers",                    active: true },
-  { id: "sub-altchart", categoryId: "cat-setup",    name: "Alternate Chart Setup",      active: true },
-  { id: "sub-fxcurr",   categoryId: "cat-setup",    name: "Setup Reporting Currencies", active: true },
-  { id: "sub-users",    categoryId: "cat-setup",    name: "Setup Users",                active: true },
-  { id: "sub-tcourse",  categoryId: "cat-training", name: "Training Courses",           active: true },
-  { id: "sub-support",  categoryId: "cat-training", name: "Additional Support",         active: true },
-  { id: "sub-mrep",     categoryId: "cat-reports",  name: "Mondial Reports",            active: true },
-  { id: "sub-exrep",    categoryId: "cat-reports",  name: "Excel Reports",              active: true },
-  { id: "sub-test",     categoryId: "cat-testing",  name: "Testing",                    active: true },
-  { id: "sub-plan",     categoryId: "cat-planning", name: "Planning and Review Meetings",active: true },
+  { id: "sub-gl",       categoryId: "cat-setup",    name: "Default GL Accounts",         active: true },
+  { id: "sub-ledgers",  categoryId: "cat-setup",    name: "Ledgers",                     active: true },
+  { id: "sub-altchart", categoryId: "cat-setup",    name: "Alternate Chart Setup",       active: true },
+  { id: "sub-fxcurr",   categoryId: "cat-setup",    name: "Setup Reporting Currencies",  active: true },
+  { id: "sub-users",    categoryId: "cat-setup",    name: "Setup Users",                 active: true },
+  { id: "sub-tcourse",  categoryId: "cat-training", name: "Training Courses",            active: true },
+  { id: "sub-support",  categoryId: "cat-training", name: "Additional Support",          active: true },
+  { id: "sub-mrep",     categoryId: "cat-reports",  name: "Mondial Reports",             active: true },
+  { id: "sub-exrep",    categoryId: "cat-reports",  name: "Excel Reports",               active: true },
+  { id: "sub-test",     categoryId: "cat-testing",  name: "Testing",                     active: true },
+  { id: "sub-plan",     categoryId: "cat-planning", name: "Planning and Review Meetings", active: true },
 ];
 const SEED_CONSULTANTS = [
-  { id: "usr-1", name: "Sarah Chen",      email: "s.chen@mondialsoftware.com",      role: "Senior Consultant",   active: true, billRate: "120", billCurrency: "GBP" },
-  { id: "usr-2", name: "James Okafor",    email: "j.okafor@mondialsoftware.com",    role: "Implementation Lead", active: true, billRate: "150", billCurrency: "GBP" },
-  { id: "usr-3", name: "Priya Nair",      email: "p.nair@mondialsoftware.com",      role: "Report Specialist",   active: true, billRate: "110", billCurrency: "GBP" },
-  { id: "usr-4", name: "Tom Müller",      email: "t.muller@mondialsoftware.com",    role: "Consultant",          active: true, billRate: "95",  billCurrency: "GBP" },
-  { id: "usr-5", name: "Mark Richardson", email: "m.richardson@mondialsoftware.com",role: "Director",            active: true, billRate: "200", billCurrency: "GBP" },
+  { id: "usr-1", name: "Sarah Chen",      email: "s.chen@mondialsoftware.com",       role: "Senior Consultant",   active: true, billRate: "120", billCurrency: "GBP" },
+  { id: "usr-2", name: "James Okafor",    email: "j.okafor@mondialsoftware.com",     role: "Implementation Lead", active: true, billRate: "150", billCurrency: "GBP" },
+  { id: "usr-3", name: "Priya Nair",      email: "p.nair@mondialsoftware.com",       role: "Report Specialist",   active: true, billRate: "110", billCurrency: "GBP" },
+  { id: "usr-4", name: "Tom Müller",      email: "t.muller@mondialsoftware.com",     role: "Consultant",          active: true, billRate: "95",  billCurrency: "GBP" },
+  { id: "usr-5", name: "Mark Richardson", email: "m.richardson@mondialsoftware.com", role: "Director",            active: true, billRate: "200", billCurrency: "GBP" },
 ];
 const SEED_OEM_PARTNERS = [
-  { id: "oem-1", name: "Apex ERP Solutions",   active: true, contacts: [{ name: "David Walsh",  email: "d.walsh@apexerp.com",      primary: true  }, { name: "Karen Lee", email: "k.lee@apexerp.com", primary: false }] },
-  { id: "oem-2", name: "CoreFinance Systems",  active: true, contacts: [{ name: "Linda Park",   email: "l.park@corefinance.com",   primary: true  }] },
-  { id: "oem-3", name: "Nexus Business Suite", active: true, contacts: [{ name: "Raj Patel",    email: "r.patel@nexusbs.com",      primary: true  }] },
+  { id: "oem-1", name: "Apex ERP Solutions",   active: true, contacts: [{ name: "David Walsh", email: "d.walsh@apexerp.com",    primary: true  }, { name: "Karen Lee", email: "k.lee@apexerp.com", primary: false }] },
+  { id: "oem-2", name: "CoreFinance Systems",  active: true, contacts: [{ name: "Linda Park",  email: "l.park@corefinance.com", primary: true  }] },
+  { id: "oem-3", name: "Nexus Business Suite", active: true, contacts: [{ name: "Raj Patel",   email: "r.patel@nexusbs.com",    primary: true  }] },
 ];
 const SEED_CUSTOMERS = [
-  { id: "cust-1", name: "Hartwell Manufacturing Group", oemId: "oem-1", contacts: [{ name: "Claire Burton", email: "c.burton@hartwell.com", title: "CFO", primary: true }, { name: "Steve Nolan", email: "s.nolan@hartwell.com", title: "IT Director", primary: false }] },
-  { id: "cust-2", name: "Meridian Logistics Ltd",       oemId: "oem-1", contacts: [{ name: "Fiona Marsh",   email: "f.marsh@meridian.com",  title: "Finance Director", primary: true }] },
-  { id: "cust-3", name: "Castello Retail Group",        oemId: "oem-2", contacts: [{ name: "Antonio Reyes", email: "a.reyes@castello.com",  title: "Group CFO", primary: true }] },
-  { id: "cust-4", name: "Brightside Financial Services",oemId: "oem-3", contacts: [{ name: "Neil Thompson", email: "n.thompson@brightside.com", title: "COO", primary: true }] },
-  { id: "cust-5", name: "Verano Property Holdings",     oemId: "oem-2", contacts: [{ name: "Lucy Huang",    email: "l.huang@verano.com",    title: "Finance Manager", primary: true }] },
+  { id: "cust-1", name: "Hartwell Manufacturing Group", oemId: "oem-1", contacts: [{ name: "Claire Burton", email: "c.burton@hartwell.com", title: "CFO",              primary: true  }, { name: "Steve Nolan", email: "s.nolan@hartwell.com", title: "IT Director", primary: false }] },
+  { id: "cust-2", name: "Meridian Logistics Ltd",       oemId: "oem-1", contacts: [{ name: "Fiona Marsh",   email: "f.marsh@meridian.com",  title: "Finance Director", primary: true  }] },
+  { id: "cust-3", name: "Castello Retail Group",        oemId: "oem-2", contacts: [{ name: "Antonio Reyes", email: "a.reyes@castello.com",  title: "Group CFO",        primary: true  }] },
+  { id: "cust-4", name: "Brightside Financial Services",oemId: "oem-3", contacts: [{ name: "Neil Thompson", email: "n.thompson@brightside.com", title: "COO",          primary: true  }] },
+  { id: "cust-5", name: "Verano Property Holdings",     oemId: "oem-2", contacts: [{ name: "Lucy Huang",    email: "l.huang@verano.com",    title: "Finance Manager",  primary: true  }] },
 ];
 const SEED_TEMPLATES = [
   { id: "tmpl-1", name: "Standard SME Implementation", description: "Single-ledger, single-currency, up to 5 companies", totalHours: 80,
-    items: [{ categoryId: "cat-setup", subcategoryId: null, hours: 30 },{ categoryId: "cat-training", subcategoryId: null, hours: 20 },{ categoryId: "cat-reports", subcategoryId: null, hours: 15 },{ categoryId: "cat-testing", subcategoryId: null, hours: 10 },{ categoryId: "cat-planning", subcategoryId: null, hours: 5 }] },
+    items: [{ categoryId:"cat-setup",subcategoryId:null,hours:30 },{ categoryId:"cat-training",subcategoryId:null,hours:20 },{ categoryId:"cat-reports",subcategoryId:null,hours:15 },{ categoryId:"cat-testing",subcategoryId:null,hours:10 },{ categoryId:"cat-planning",subcategoryId:null,hours:5 }] },
   { id: "tmpl-2", name: "Multi-Currency Enterprise", description: "Multi-ledger, multi-currency, consolidation reporting", totalHours: 200,
-    items: [{ categoryId: "cat-setup", subcategoryId: "sub-fxcurr", hours: 20 },{ categoryId: "cat-setup", subcategoryId: "sub-gl", hours: 10 },{ categoryId: "cat-training", subcategoryId: "sub-tcourse", hours: 30 },{ categoryId: "cat-reports", subcategoryId: "sub-mrep", hours: 25 },{ categoryId: "cat-testing", subcategoryId: "sub-test", hours: 15 },{ categoryId: "cat-planning", subcategoryId: "sub-plan", hours: 10 }] },
+    items: [{ categoryId:"cat-setup",subcategoryId:"sub-fxcurr",hours:20 },{ categoryId:"cat-setup",subcategoryId:"sub-gl",hours:10 },{ categoryId:"cat-training",subcategoryId:"sub-tcourse",hours:30 },{ categoryId:"cat-reports",subcategoryId:"sub-mrep",hours:25 },{ categoryId:"cat-testing",subcategoryId:"sub-test",hours:15 },{ categoryId:"cat-planning",subcategoryId:"sub-plan",hours:10 }] },
 ];
 const SEED_PROJECTS = [
-  { id: "proj-1", customerId: "cust-1", name: "Hartwell — Phase 1 Go-Live", status: "active", leadConsultantId: "usr-2", consultantIds: ["usr-2","usr-1","usr-3"], templateId: "tmpl-2", poHours: 200, categories: [{ categoryId: "cat-setup", plannedHours: 90, usedHours: 85 }, { categoryId: "cat-training", plannedHours: 40, usedHours: 28 }] },
-  { id: "proj-2", customerId: "cust-3", name: "Castello — Mondial Onboarding", status: "active", leadConsultantId: "usr-1", consultantIds: ["usr-1","usr-4"], templateId: "tmpl-1", poHours: 80, categories: [] },
+  { id:"proj-1",customerId:"cust-1",name:"Hartwell — Phase 1 Go-Live",status:"active",leadConsultantId:"usr-2",consultantIds:["usr-2","usr-1","usr-3"],templateId:"tmpl-2",poHours:200,categories:[{categoryId:"cat-setup",plannedHours:90,usedHours:85},{categoryId:"cat-training",plannedHours:40,usedHours:28}] },
+  { id:"proj-2",customerId:"cust-3",name:"Castello — Mondial Onboarding",status:"active",leadConsultantId:"usr-1",consultantIds:["usr-1","usr-4"],templateId:"tmpl-1",poHours:80,categories:[] },
 ];
 
+// ── Help key map: section id → helpContent key ────────────────────────────────
+const SECTION_HELP = {
+  consultants: "setupConsultants",
+  customers:   "setupCustomersOem",
+  categories:  "setupCategories",
+  templates:   "setupTemplates",
+};
+
+// ── Main Setup page ───────────────────────────────────────────────────────────
 export default function Setup({ state: externalState, onUpdate: externalUpdate }) {
   const isStandalone = !externalState;
   const [internalState, setInternalState] = useState({
-    categories: SEED_CATEGORIES,
-    subcategories: SEED_SUBCATEGORIES,
-    consultants: SEED_CONSULTANTS,
-    oemPartners: SEED_OEM_PARTNERS,
-    customers: SEED_CUSTOMERS,
-    templates: SEED_TEMPLATES,
-    projects: SEED_PROJECTS,
+    categories: SEED_CATEGORIES, subcategories: SEED_SUBCATEGORIES,
+    consultants: SEED_CONSULTANTS, oemPartners: SEED_OEM_PARTNERS,
+    customers: SEED_CUSTOMERS, templates: SEED_TEMPLATES, projects: SEED_PROJECTS,
   });
 
   const state = externalState || internalState;
@@ -933,9 +894,11 @@ export default function Setup({ state: externalState, onUpdate: externalUpdate }
     { id: "templates",   label: "Templates",       icon: "📋" },
   ];
   const [section, setSection] = useState("consultants");
+  const [showHelp, setShowHelp] = useState(false);
 
   return (
     <div style={{ flex:1, display:"flex", overflow:"hidden", fontFamily: "'Segoe UI', Arial, sans-serif", fontSize: 13 }}>
+      {/* Sidebar */}
       <div style={{ width:180, background:"#f8f9fa", borderRight:"1px solid #dee2e6", padding:"12px 0" }}>
         <div style={{fontSize:10,fontWeight:700,color:"#6c757d",textTransform:"uppercase",letterSpacing:0.5,padding:"0 14px 8px"}}>Setup</div>
         {sections.map(s=>(
@@ -947,12 +910,24 @@ export default function Setup({ state: externalState, onUpdate: externalUpdate }
           </div>
         ))}
       </div>
+
+      {/* Main content */}
       <div style={{flex:1,overflow:"auto",padding:24}}>
+        {/* Section header with help button */}
+        <div style={{ display:"flex",alignItems:"center",justifyContent:"flex-end",marginBottom:4 }}>
+          <HelpButton onClick={() => setShowHelp(true)} />
+        </div>
+
         {section==="consultants" && <ConsultantsSetup state={state} onUpdate={onUpdate} />}
         {section==="customers"   && <CustomersSetup   state={state} onUpdate={onUpdate} />}
         {section==="categories"  && <CategoriesSetup  state={state} onUpdate={onUpdate} />}
         {section==="templates"   && <TemplatesSetup   state={state} onUpdate={onUpdate} />}
       </div>
+
+      {/* Help modal — content changes with active section */}
+      {showHelp && (
+        <HelpModal content={helpContent[SECTION_HELP[section]]} onClose={() => setShowHelp(false)} />
+      )}
     </div>
   );
 }
